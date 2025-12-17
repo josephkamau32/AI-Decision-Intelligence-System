@@ -61,16 +61,16 @@ const DatasetOverview: React.FC = () => {
           datasets.map((dataset) => (
             <Card key={dataset.id} variant="glass" hoverable className={styles.datasetCard}>
               <div className={styles.cardHeader}>
-                <h3 className={styles.datasetName}>{dataset.name}</h3>
+                <h3 className={styles.datasetName}>{dataset.name || 'Unnamed Dataset'}</h3>
               </div>
               <div className={styles.cardStats}>
                 <div className={styles.stat}>
                   <span className={styles.statLabel}>Rows</span>
-                  <span className={styles.statValue}>{dataset.rows.toLocaleString()}</span>
+                  <span className={styles.statValue}>{dataset.rows?.toLocaleString() || '0'}</span>
                 </div>
                 <div className={styles.stat}>
                   <span className={styles.statLabel}>Columns</span>
-                  <span className={styles.statValue}>{dataset.columns}</span>
+                  <span className={styles.statValue}>{dataset.columns || '0'}</span>
                 </div>
               </div>
             </Card>
