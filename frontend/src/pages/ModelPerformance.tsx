@@ -1,32 +1,174 @@
 import React, { useEffect, useState } from 'react';
-import { getModelPerformance } from '../services/modelService';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import SkeletonLoader from '../components/ui/SkeletonLoader';
+import styles from './ModelPerformance.module.css';
+
+interface Model {
+  id: string;
+  name: string;
+  type: string;
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1Score: number;
+  trainedAt: string;
+}
 
 const ModelPerformance: React.FC = () => {
-  const [performance, setPerformance] = useState<any>(null);
+  const [models, setModels] = useState<Model[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedModel, setSelectedModel] = useState<Model | null>(null);
 
   useEffect(() => {
-    const fetchPerformance = async () => {
-      try {
-        const data = await getModelPerformance();
-        setPerformance(data);
-      } catch (error) {
-        console.error('Failed to fetch performance', error);
-      }
-    };
-    fetchPerformance();
+    // Simulate loading models
+    setTimeout(() => {
+      setModels([
+        {
+          id: '1',
+          name: 'Customer Churn Predictor',
+          type: 'Random Forest',
+          accuracy: 94.5,
+          precision: 92.3,
+          recall: 89.7,
+          f1Score: 90.9,
+          trainedAt: '2025-01-15'
+        },
+        {
+          id: '2',
+          name: 'Sales Forecaster',
+          type: 'XGBoost',
+          accuracy: 91.2,
+          precision: 88.9,
+          recall: 92.1,
+          f1Score: 90.5,
+          trainedAt: '2025-01-14'
+        },
+        {
+          id: '3',
+          name: 'Sentiment Classifier',
+          type: 'Neural Network',
+          accuracy: 87.8,
+          precision: 85.6,
+          recall: 88.3,
+          f1Score: 86.9,
+          trainedAt: '2025-01-13'
+        }
+      ]);
+      setLoading(false);
+    }, 1000);
   }, []);
 
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return styles.scoreHigh;
+    if (score >= 75) return styles.scoreMedium;
+    return styles.scoreLow;
+  };
+
   return (
-    <div>
-      <h1>Model Performance Metrics</h1>
-      {performance ? (
+    <div className={styles.container}>
+      <div className={styles.header}>
         <div>
-          <p>Accuracy: {performance.accuracy}</p>
-          <p>Precision: {performance.precision}</p>
-          <p>Recall: {performance.recall}</p>
+          <h1 className={styles.title}>Model Performance</h1>
+          <p className={styles.subtitle}>Monitor and compare your ML models</p>
         </div>
-      ) : (
-        <p>Loading...</p>
+        <Button variant="primary">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Train New Model
+        </Button>
+      </div>
+
+      <div className={styles.grid}>
+        {loading ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <Card key={i} variant="glass">
+                <SkeletonLoader variant="rect" height={200} />
+              </Card>
+            ))}
+          </>
+        ) : models.length === 0 ? (
+          <div className={styles.empty}>
+            <svg className={styles.emptyIcon} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <p className={styles.emptyText}>No models found</p>
+            <p className={styles.emptySubtext}>Train your first model to see performance metrics</p>
+          </div>
+        ) : (
+          models.map((model) => (
+            <Card
+              key={model.id}
+              variant="glass"
+              hoverable
+              className={`${styles.modelCard} ${selectedModel?.id === model.id ? styles.selected : ''}`}
+              onClick={() => setSelectedModel(model)}
+            >
+              <div className={styles.cardHeader}>
+                <h3 className={styles.modelName}>{model.name}</h3>
+                <span className={styles.modelType}>{model.type}</span>
+              </div>
+
+              <div className={styles.metricsGrid}>
+                <div className={styles.metric}>
+                  <span className={styles.metricLabel}>Accuracy</span>
+                  <div className={styles.metricValueContainer}>
+                    <span className={`${styles.metricValue} ${getScoreColor(model.accuracy)}`}>
+                      {model.accuracy}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.metric}>
+                  <span className={styles.metricLabel}>Precision</span>
+                  <div className={styles.metricValueContainer}>
+                    <span className={`${styles.metricValue} ${getScoreColor(model.precision)}`}>
+                      {model.precision}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.metric}>
+                  <span className={styles.metricLabel}>Recall</span>
+                  <div className={styles.metricValueContainer}>
+                    <span className={`${styles.metricValue} ${getScoreColor(model.recall)}`}>
+                      {model.recall}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.metric}>
+                  <span className={styles.metricLabel}>F1 Score</span>
+                  <div className={styles.metricValueContainer}>
+                    <span className={`${styles.metricValue} ${getScoreColor(model.f1Score)}`}>
+                      {model.f1Score}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.cardFooter}>
+                <span className={styles.trainedDate}>
+                  Trained: {new Date(model.trainedAt).toLocaleDateString()}
+                </span>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {selectedModel && (
+        <Card variant="glass" className={styles.detailsCard}>
+          <h2 className={styles.detailsTitle}>Model Details: {selectedModel.name}</h2>
+          <div className={styles.detailsContent}>
+            <p className={styles.detailsText}>
+              Detailed performance metrics and visualizations would appear here.
+              This could include confusion matrices, ROC curves, and feature importance charts.
+            </p>
+          </div>
+        </Card>
       )}
     </div>
   );

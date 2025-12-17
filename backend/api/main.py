@@ -17,6 +17,7 @@ from .health import router as health_router
 from .datasets import router as datasets_router
 from .models import router as models_router
 from .visualizations import router as visualizations_router
+from .copilot import router as copilot_router
 from ..utils.config import settings
 
 # Configure logging
@@ -175,6 +176,12 @@ app.include_router(
     visualizations_router,
     prefix=f"{settings.api_v1_prefix}/visualizations",
     tags=["visualizations"]
+)
+
+app.include_router(
+    copilot_router,
+    prefix=f"{settings.api_v1_prefix}/copilot",
+    tags=["copilot"]
 )
 
 # Health check with details

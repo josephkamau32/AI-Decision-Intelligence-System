@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastProvider';
 import Layout from './components/Layout/Layout';
 import Toast from './components/ui/Toast';
 import Spinner from './components/ui/Spinner';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy load pages for code splitting
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -28,25 +29,27 @@ const PageLoader = () => (
 
 function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <Router>
-          <Layout>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dataset-overview" element={<DatasetOverview />} />
-                <Route path="/model-performance" element={<ModelPerformance />} />
-                <Route path="/feature-importance" element={<FeatureImportance />} />
-                <Route path="/visual-insights" element={<VisualInsights />} />
-                <Route path="/copilot" element={<CopilotChat />} />
-              </Routes>
-            </Suspense>
-          </Layout>
-          <Toast />
-        </Router>
-      </ToastProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <ToastProvider>
+          <Router>
+            <Layout>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/dataset-overview" element={<DatasetOverview />} />
+                  <Route path="/model-performance" element={<ModelPerformance />} />
+                  <Route path="/feature-importance" element={<FeatureImportance />} />
+                  <Route path="/visual-insights" element={<VisualInsights />} />
+                  <Route path="/copilot" element={<CopilotChat />} />
+                </Routes>
+              </Suspense>
+            </Layout>
+            <Toast />
+          </Router>
+        </ToastProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
