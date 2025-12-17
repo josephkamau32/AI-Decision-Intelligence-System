@@ -1,0 +1,38 @@
+# Python dependencies for backend
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+aiofiles
+# ML dependencies
+pandas
+scikit-learn
+xgboost
+prophet
+torch
+torchvision
+mlflow
+shap
+plotly
+kaleido  # for static images
+# AI Copilot dependencies
+langchain
+langchain-openai
+chromadb
+faiss-cpu
+tiktoken
+# MLOps dependencies
+celery[redis]
+redis
+alibi-detect
+prometheus-client
+numpy
+# Testing and quality dependencies
+pytest
+pytest-asyncio
+black
+flake8
