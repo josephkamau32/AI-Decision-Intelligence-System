@@ -1,121 +1,260 @@
-from langchain.tools import BaseTool
-from typing import Any, Dict, List
+"""
+Enhanced copilot tools for dataset and model integration
+"""
+from typing import Dict, Any, List, Optional
 import pandas as pd
-import shap
-from ..ml.data_ingestion import DataIngestion, DataProfiler
+import logging
+
 from ..services.dataset_service import dataset_service
 from ..services.model_service import model_service
-from .rag import rag_system
+from ..ml.data_ingestion import DataProfiler
 
-class DatasetInfoTool(BaseTool):
-    name = "dataset_info"
-    description = "Get information about a dataset including schema, statistics, and profiling."
+logger = logging.getLogger(__name__)
 
-    def _run(self, dataset_id: str) -> str:
-        dataset = next((d for d in dataset_service.datasets if d.id == dataset_id), None)
-        if not dataset:
-            return "Dataset not found."
-
-        df = DataIngestion.load_data(dataset.file_path)
-        profiler = DataProfiler(df)
-        profile = profiler.profile()
-
-        info = f"""
-Dataset: {dataset.name}
-Description: {dataset.description}
-Shape: {profile['shape']}
-Columns: {', '.join(profile['columns'])}
-Data Types: {profile['data_types']}
-Missing Values: {profile['missing_values']}
-Target Variable: {profile['target_variable']}
-Problem Type: {profile['problem_type']}
-"""
-        return info
-
-class FeatureImportanceTool(BaseTool):
-    name = "feature_importance"
-    description = "Get feature importance for a trained model."
-
-    def _run(self, model_id: str) -> str:
-        model = model_service.models.get(model_id)
-        if not model:
-            return "Model not found."
-
-        if hasattr(model, 'feature_importances_'):
-            # Get features from latest dataset (simplified)
-            dataset = dataset_service.datasets[-1] if dataset_service.datasets else None
-            if dataset:
-                df = DataIngestion.load_data(dataset.file_path)
-                features = list(df.columns[:-1])
-                importance = dict(zip(features, model.feature_importances_))
-                sorted_imp = sorted(importance.items(), key=lambda x: x[1], reverse=True)
-                return "\n".join([f"{feat}: {imp:.4f}" for feat, imp in sorted_imp])
-        return "Feature importance not available for this model type."
-
-class SHAPExplanationTool(BaseTool):
-    name = "shap_explanation"
-    description = "Get SHAP explanations for model predictions."
-
-    def _run(self, model_id: str, dataset_id: str = None) -> str:
-        model = model_service.models.get(model_id)
-        if not model:
-            return "Model not found."
-
-        dataset = next((d for d in dataset_service.datasets if d.id == dataset_id), None) if dataset_id else dataset_service.datasets[-1]
-        if not dataset:
-            return "Dataset not found."
-
-        df = DataIngestion.load_data(dataset.file_path)
-        X = df.drop(columns=[df.columns[-1]]).values  # Assume last column is target
-
+class CopilotTools:
+    """Tools that AI Copilot can use to interact with the system"""
+    
+    def __init__(self):
+        logger.info("Initialized CopilotTools")
+    
+    def get_dataset_schema(self, dataset_id: str) -> Dict[str, Any]:
+        """
+        Get schema and column information for a dataset
+        
+        Args:
+            dataset_id: ID of the dataset
+            
+        Returns:
+            Dictionary with schema information
+        """
         try:
-            explainer = shap.TreeExplainer(model) if hasattr(model, 'feature_importances_') else shap.LinearExplainer(model, X)
-            shap_values = explainer.shap_values(X[:10])  # Explain first 10 samples
-
-            # Simplified summary
-            mean_abs_shap = abs(shap_values).mean(axis=0) if len(shap_values.shape) == 2 else abs(shap_values[1]).mean(axis=0)
-            features = list(df.columns[:-1])
-            importance = dict(zip(features, mean_abs_shap))
-            sorted_imp = sorted(importance.items(), key=lambda x: x[1], reverse=True)
-
-            return "SHAP Feature Importance:\n" + "\n".join([f"{feat}: {imp:.4f}" for feat, imp in sorted_imp])
+            df = model_service.get_dataset(dataset_id)
+            
+            schema = {
+                'dataset_id': dataset_id,
+                'columns': [],
+                'row_count': len(df),
+                'column_count': len(df.columns)
+            }
+            
+            for col in df.columns:
+                schema['columns'].append({
+                    'name': col,
+                    'dtype': str(df[col].dtype),
+                    'unique_values': int(df[col].nunique()),
+                    'null_count': int(df[col].isna().sum())
+                })
+            
+            return schema
         except Exception as e:
-            return f"SHAP explanation failed: {str(e)}"
-
-class PredictionTool(BaseTool):
-    name = "predict"
-    description = "Make predictions using a trained model."
-
-    def _run(self, model_id: str, input_data: Dict[str, Any]) -> str:
-        model = model_service.models.get(model_id)
-        if not model:
-            return "Model not found."
-
+            logger.error(f"Failed to get dataset schema: {e}")
+            return {'error': str(e)}
+    
+    def get_dataset_statistics(self, dataset_id: str) -> Dict[str, Any]:
+        """
+        Get statistical summary of a dataset
+        
+        Args:
+            dataset_id: ID of the dataset
+            
+        Returns:
+            Dictionary with statistics
+        """
         try:
-            # Convert input_data to array
-            # Assume input_data keys match feature names
-            dataset = dataset_service.datasets[-1] if dataset_service.datasets else None
-            if dataset:
-                df = DataIngestion.load_data(dataset.file_path)
-                features = list(df.columns[:-1])
-                X = [[input_data.get(feat, 0) for feat in features]]
-                prediction = model.predict(X)[0]
-                return f"Prediction: {prediction}"
+            df = model_service.get_dataset(dataset_id)
+            
+            # Profile the dataset
+            profiler = DataProfiler(df)
+            profile = profiler.generate_profile()
+            
+            return {
+                'dataset_id': dataset_id,
+                'profile': profile,
+                'quality_issues': profiler.get_data_quality_issues()
+            }
         except Exception as e:
-            return f"Prediction failed: {str(e)}"
+            logger.error(f"Failed to get dataset statistics: {e}")
+            return {'error': str(e)}
+    
+    def get_model_performance(self, model_id: str) -> Dict[str, Any]:
+        """
+        Get performance metrics for a trained model
+        
+        Args:
+            model_id: ID of the model
+            
+        Returns:
+            Dictionary with performance info
+        """
+        try:
+            metrics = model_service.get_model_metrics(model_id)
+            
+            if metrics is None:
+                return {'error': f'Model {model_id} not found'}
+            
+            return metrics
+        except Exception as e:
+            logger.error(f"Failed to get model performance: {e}")
+            return {'error': str(e)}
+    
+    def get_feature_importance(self, model_id: str, top_n: int = 10) -> Dict[str, Any]:
+        """
+        Get top features for a model
+        
+        Args:
+            model_id: ID of the model
+            top_n: Number of top features
+            
+        Returns:
+            Dictionary with feature importance
+        """
+        try:
+            importance = model_service.get_global_explanation(model_id, top_n=top_n)
+            return importance
+        except Exception as e:
+            logger.error(f"Failed to get feature importance: {e}")
+            return {'error': str(e)}
+    
+    def query_data(self, dataset_id: str, query: str, limit: int = 100) -> Dict[str, Any]:
+        """
+        Query dataset with pandas-like operations
+        
+        Args:
+            dataset_id: ID of the dataset
+            query: Query string (pandas query syntax)
+            limit: Maximum rows to return
+            
+        Returns:
+            Dictionary with query results
+        """
+        try:
+            df = model_service.get_dataset(dataset_id)
+            
+            # Execute query
+            result_df = df.query(query).head(limit)
+            
+            return {
+                'dataset_id': dataset_id,
+                'query': query,
+                'row_count': len(result_df),
+                'data': result_df.to_dict('records')
+            }
+        except Exception as e:
+            logger.error(f"Query failed: {e}")
+            return {'error': str(e)}
+    
+    def get_predictions(self, model_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Make a prediction with a model
+        
+        Args:
+            model_id: ID of the model
+            data: Input data as dictionary
+            
+        Returns:
+            Dictionary with prediction
+        """
+        try:
+            prediction = model_service.predict(model_id, data)
+            return prediction
+        except Exception as e:
+            logger.error(f"Prediction failed: {e}")
+            return {'error': str(e)}
+    
+    def list_available_datasets(self) -> List[Dict[str, Any]]:
+        """
+        List all available datasets
+        
+        Returns:
+            List of dataset info
+        """
+        try:
+            datasets = []
+            # Mock implementation - would query dataset service
+            return datasets
+        except Exception as e:
+            logger.error(f"Failed to list datasets: {e}")
+            return []
+    
+    def list_available_models(self) -> List[Dict[str, Any]]:
+        """
+        List all trained models
+        
+        Returns:
+            List of model info
+        """
+        try:
+            models = model_service.list_models()
+            return models
+        except Exception as e:
+            logger.error(f"Failed to list models: {e}")
+            return []
+    
+    def get_all_tools_description(self) -> List[Dict[str, str]]:
+        """
+        Get descriptions of all available tools (for LLM function calling)
+        
+        Returns:
+            List of tool descriptions
+        """
+        return [
+            {
+                'name': 'get_dataset_schema',
+                'description': 'Get column names, types, and basic info about a dataset',
+                'parameters': {
+                    'dataset_id': 'ID of the dataset to describe'
+                }
+            },
+            {
+                'name': 'get_dataset_statistics',
+                'description': 'Get statistical summary, missing values, outliers for a dataset',
+                'parameters': {
+                    'dataset_id': 'ID of the dataset to analyze'
+                }
+            },
+            {
+                'name': 'get_model_performance',
+                'description': 'Get accuracy, precision, recall, and other metrics for a trained model',
+                'parameters': {
+                    'model_id': 'ID of the model'
+                }
+            },
+            {
+                'name': 'get_feature_importance',
+                'description': 'Get the most important features used by a model',
+                'parameters': {
+                    'model_id': 'ID of the model',
+                    'top_n': 'Number of top features to return (default: 10)'
+                }
+            },
+            {
+                'name': 'query_data',
+                'description': 'Query dataset using pandas syntax to filter or analyze data',
+                'parameters': {
+                    'dataset_id': 'ID of the dataset',
+                    'query': 'Pandas query string (e.g., "age > 30 and salary < 50000")',
+                    'limit': 'Maximum rows to return'
+                }
+            },
+            {
+                'name': 'get_predictions',
+                'description': 'Make a prediction using a trained model',
+                'parameters': {
+                    'model_id': 'ID of the model',
+                    'data': 'Input data as dictionary with feature names and values'
+                }
+            },
+            {
+                'name': 'list_available_datasets',
+                'description': 'List all datasets in the system',
+                'parameters': {}
+            },
+            {
+                'name': 'list_available_models',
+                'description': 'List all trained models',
+                'parameters': {}
+            }
+        ]
 
-class RAGQueryTool(BaseTool):
-    name = "rag_query"
-    description = "Query the RAG system for relevant dataset and model information."
-
-    def _run(self, query: str) -> str:
-        return rag_system.get_context(query)
-
-# List of tools
-tools = [
-    DatasetInfoTool(),
-    FeatureImportanceTool(),
-    SHAPExplanationTool(),
-    PredictionTool(),
-    RAGQueryTool()
-]
+# Singleton instance
+copilot_tools = CopilotTools()

@@ -1,121 +1,315 @@
-from .celery_app import celery_app
-from .pipelines.ai_pipeline import AIPipeline
-from .services.dataset_service import dataset_service
-from .services.model_service import model_service
-import mlflow
-from mlops.registry.setup import register_model
-import shap
-import numpy as np
+"""
+Celery tasks for async processing integrated with new AutoML engine
+"""
+from celery_app import celery_app
+from ml.automl import AutoML
+from ml.data_preprocessing import DataCleaner, FeatureEngineer
+from ml.explainability import ModelExplainer
+from services.dataset_service import dataset_service
+from services.model_service import model_service
 import pandas as pd
+import numpy as np
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-@celery_app.task(bind=True)
-def train_model_task(self, dataset_id: str, model_type: str, parameters: dict = None):
-    """Async task for model training."""
+@celery_app.task(bind=True, name='tasks.train_model')
+def train_model_task(
+    self,
+    task_id: str,
+    dataset_id: str,
+    target_column: str,
+    task_type: str = 'auto',
+    test_size: float = 0.2,
+    experiment_name: str = "AutoML"
+):
+    """
+    Async Celery task for model training using AutoML engine
+    
+    Args:
+        task_id: Unique task identifier
+        dataset_id: ID of the dataset to train on
+        target_column: Name of the target variable
+        task_type: 'classification', 'regression', or 'auto'
+        test_size: Proportion for test set
+        experiment_name: MLflow experiment name
+    """
     try:
-        self.update_state(state='PROGRESS', meta={'message': 'Starting training'})
-
-        dataset = next((d for d in dataset_service.datasets if d.id == dataset_id), None)
-        if not dataset:
-            raise ValueError("Dataset not found")
-
-        pipeline = AIPipeline()
-        result = pipeline.run_pipeline(dataset.file_path)
-        processed_data = result['processed_data']
-        profile = result['profile']
-        automl_result = result['automl_result']
-        trained_model = automl_result['trained_model']
-        features = list(processed_data.drop(columns=[profile['target_variable']]).columns)
-
+        logger.info(f"[Task {task_id}] Starting AutoML training for dataset {dataset_id}")
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 10, 'message': 'Loading dataset...'}
+        )
+        
+        # Load dataset
+        dataset_df = model_service.get_dataset(dataset_id)
+        
+        if target_column not in dataset_df.columns:
+            raise ValueError(f"Target column '{target_column}' not found in dataset")
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 20, 'message': 'Preprocessing data...'}
+        )
+        
+        # Data preprocessing
+        cleaner = DataCleaner(dataset_df)
+        cleaned_df = cleaner.handle_missing_values(strategy='mean')
+        
+        # Separate features and target
+        X = cleaned_df.drop(columns=[target_column])
+        y = cleaned_df[target_column]
+        
+        # Feature engineering
+        engineer = FeatureEngineer(X)
+        X_encoded = engineer.encode_categorical(method='label')
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 30, 'message': 'Training models...'}
+        )
+        
+        # Initialize and train AutoML
+        automl = AutoML(task_type=task_type, test_size=test_size)
+        results = automl.fit(X_encoded, y, dataset_id=dataset_id, experiment_name=experiment_name)
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 80, 'message': 'Generating explanations...'}
+        )
+        
         # Create explainer
-        explainer = None
-        background = None
-        if profile['problem_type'] != 'time_series':
-            if hasattr(trained_model, 'feature_importances_'):  # tree
-                explainer = shap.TreeExplainer(trained_model)
-            elif hasattr(trained_model, 'coef_'):  # linear
-                background = processed_data[features].values[:min(100, len(processed_data))]
-                explainer = shap.LinearExplainer(trained_model, background)
-            else:
-                background = processed_data[features].values[:min(100, len(processed_data))]
-                explainer = shap.KernelExplainer(trained_model.predict, background)
-
-        model_data = {
-            'model': trained_model,
+        explainer = ModelExplainer(automl.best_model, X_encoded.sample(min(100, len(X_encoded))))
+        
+        # Save model
+        model_id = task_id
+        model_path = Path("models") / f"{model_id}.joblib"
+        model_path.parent.mkdir(exist_ok=True)
+        automl.save_model(str(model_path))
+        
+        # Store in model service
+        model_service.models[model_id] = {
+            'automl': automl,
+            'model': automl.best_model,
             'explainer': explainer,
-            'features': features,
-            'target': profile['target_variable'],
-            'problem_type': profile['problem_type'],
-            'background': background
+            'X_sample': X_encoded.sample(min(100, len(X_encoded))),
+            'feature_names': X_encoded.columns.tolist(),
+            'target_column': target_column,
+            'task_type': results['task_type'],
+            'best_model_name': results['best_model'],
+            'best_score': results['best_score'],
+            'all_results': results['all_results']
         }
-
-        run_id = automl_result.get('run_id')
-        model_name = None
-        if run_id:
-            model_name = f"{automl_result['best_model']}_{self.request.id}"
-            register_model(run_id, model_name, "model")
-
+        
+        # Update task status in model service
+        model_service.tasks[task_id] = {
+            'status': 'completed',
+            'message': f"Training completed. Best model: {results['best_model']}",
+            'progress': 100,
+            'model_id': model_id,
+            'results': results
+        }
+        
+        logger.info(f"[Task {task_id}] Training completed successfully")
+        
         return {
             'status': 'completed',
-            'model_data': model_data,
-            'model_name': model_name,
-            'message': f"Training completed with best model {automl_result['best_model']}"
+            'task_id': task_id,
+            'model_id': model_id,
+            'best_model': results['best_model'],
+            'best_score': results['best_score'],
+            'message': f"Training completed with {results['best_model']} (score: {results['best_score']:.4f})"
         }
-
+        
     except Exception as e:
-        logger.error(f"Training failed: {str(e)}")
+        logger.error(f"[Task {task_id}] Training failed: {e}")
+        
+        # Update task status
+        if task_id in model_service.tasks:
+            model_service.tasks[task_id] = {
+                'status': 'failed',
+                'message': f"Training failed: {str(e)}",
+                'progress': 0,
+                'error': str(e)
+            }
+        
         raise
 
-@celery_app.task(bind=True)
-def perform_inference_task(self, model_id: str, input_data: dict):
-    """Async task for inference."""
+@celery_app.task(bind=True, name='tasks.batch_predict')
+def batch_predict_task(self, model_id: str, data_list: list):
+    """
+    Async task for batch predictions
+    
+    Args:
+        model_id: ID of the trained model
+        data_list: List of dictionaries with input data
+    """
     try:
-        if model_id not in model_service.models:
-            raise ValueError("Model not found")
-
-        model_info = model_service.models[model_id]
-        model = model_info['model']
-        features = model_info['features']
-
-        # Prepare input
-        input_df = pd.DataFrame([input_data])
-        input_df = input_df[features]  # Ensure correct feature order
-
-        prediction = model.predict(input_df)
-
+        logger.info(f"Batch prediction task for model {model_id}, {len(data_list)} samples")
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 20, 'message': 'Loading model...'}
+        )
+        
+        # Make predictions using model service
+        results = model_service.predict_batch(model_id, data_list)
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 100, 'message': 'Predictions completed'}
+        )
+        
+        logger.info(f"Batch predictions completed for model {model_id}")
+        
         return {
-            'prediction': prediction.tolist() if hasattr(prediction, 'tolist') else prediction,
-            'confidence': 0.95  # Mock confidence
+            'status': 'completed',
+            'predictions': results,
+            'count': len(results)
         }
-
+        
     except Exception as e:
-        logger.error(f"Inference failed: {str(e)}")
+        logger.error(f"Batch prediction failed: {e}")
         raise
 
-@celery_app.task(bind=True)
-def batch_inference_task(self, model_id: str, input_data_list: list):
-    """Async task for batch inference."""
+@celery_app.task(bind=True, name='tasks.profile_dataset')
+def profile_dataset_task(self, dataset_id: str):
+    """
+    Async task for dataset profiling and quality analysis
+    
+    Args:
+        dataset_id: ID of the dataset to profile
+    """
     try:
-        if model_id not in model_service.models:
-            raise ValueError("Model not found")
-
-        model_info = model_service.models[model_id]
-        model = model_info['model']
-        features = model_info['features']
-
-        # Prepare input
-        input_df = pd.DataFrame(input_data_list)
-        input_df = input_df[features]
-
-        predictions = model.predict(input_df)
-
-        return {
-            'predictions': predictions.tolist() if hasattr(predictions, 'tolist') else predictions,
-            'confidence': 0.95
+        logger.info(f"Profiling dataset {dataset_id}")
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 10, 'message': 'Loading dataset...'}
+        )
+        
+        # Load dataset
+        dataset_df = model_service.get_dataset(dataset_id)
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 30, 'message': 'Analyzing data...'}
+        )
+        
+        # Generate profile
+        profile = {
+            'rows': len(dataset_df),
+            'columns': len(dataset_df.columns),
+            'memory_usage': dataset_df.memory_usage(deep=True).sum() / 1024**2,  # MB
+            'columns_info': [],
+            'missing_values': {},
+            'duplicates': int(dataset_df.duplicated().sum()),
+            'data_types': {}
         }
-
+        
+        # Analyze each column
+        for col in dataset_df.columns:
+            col_data = dataset_df[col]
+            col_info = {
+                'name': col,
+                'dtype': str(col_data.dtype),
+                'unique_values': int(col_data.nunique()),
+                'missing_count': int(col_data.isna().sum()),
+                'missing_percent': float(col_data.isna().sum() / len(col_data) * 100)
+            }
+            
+            # Add statistics for numeric columns
+            if pd.api.types.is_numeric_dtype(col_data):
+                col_info.update({
+                    'mean': float(col_data.mean()) if not col_data.isna().all() else None,
+                    'std': float(col_data.std()) if not col_data.isna().all() else None,
+                    'min': float(col_data.min()) if not col_data.isna().all() else None,
+                    'max': float(col_data.max()) if not col_data.isna().all() else None,
+                    'median': float(col_data.median()) if not col_data.isna().all() else None
+                })
+            
+            profile['columns_info'].append(col_info)
+            
+            if col_info['missing_count'] > 0:
+                profile['missing_values'][col] = col_info['missing_count']
+            
+            profile['data_types'][col] = str(col_data.dtype)
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 100, 'message': 'Profiling completed'}
+        )
+        
+        logger.info(f"Dataset profile completed for {dataset_id}")
+        
+        return {
+            'status': 'completed',
+            'profile': profile
+        }
+        
     except Exception as e:
-        logger.error(f"Batch inference failed: {str(e)}")
+        logger.error(f"Dataset profiling failed: {e}")
+        raise
+
+@celery_app.task(bind=True, name='tasks.generate_explanations')
+def generate_explanations_task(self, model_id: str, num_samples: int = 100):
+    """
+    Async task for generating SHAP explanations
+    
+    Args:
+        model_id: ID of the trained model
+        num_samples: Number of samples to use for explanation
+    """
+    try:
+        logger.info(f"Generating explanations for model {model_id}")
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 20, 'message': 'Loading model...'}
+        )
+        
+        # Get global explanations
+        importance = model_service.get_global_explanation(model_id, top_n=20)
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 70, 'message': 'Generating plots...'}
+        )
+        
+        # Generate plots
+        summary_plot = model_service.get_explanation_plot(model_id, plot_type='summary')
+        importance_plot = model_service.get_explanation_plot(model_id, plot_type='importance')
+        
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={'progress': 100, 'message': 'Explanations generated'}
+        )
+        
+        logger.info(f"Explanations generated for model {model_id}")
+        
+        return {
+            'status': 'completed',
+            'importance': importance,
+            'plots': {
+                'summary': summary_plot,
+                'importance': importance_plot
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Explanation generation failed: {e}")
         raise
