@@ -1,38 +1,48 @@
 # Python dependencies for backend
-fastapi
-uvicorn[standard]
-pydantic
-pydantic-settings
-python-multipart
-python-jose[cryptography]
-passlib[bcrypt]
-python-dotenv
-aiofiles
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+aiofiles==23.2.1
+
 # ML dependencies
-pandas
-scikit-learn
-xgboost
-prophet
-torch
-torchvision
-mlflow
-shap
-plotly
-kaleido  # for static images
+pandas==2.1.4
+scikit-learn==1.4.0
+xgboost==2.0.3
+prophet==1.1.5
+torch==2.1.2
+torchvision==0.16.2
+mlflow==2.9.2
+shap==0.44.0
+plotly==5.18.0
+kaleido==0.2.1
+
 # AI Copilot dependencies
-langchain
-langchain-openai
-chromadb
-faiss-cpu
-tiktoken
+langchain==0.1.0
+langchain-openai==0.0.2
+chromadb==0.4.22
+faiss-cpu==1.7.4
+tiktoken==0.5.2
+openai==1.7.2
+
 # MLOps dependencies
-celery[redis]
-redis
-alibi-detect
-prometheus-client
-numpy
+celery[redis]==5.3.4
+redis==5.0.1
+alibi-detect==0.11.4
+prometheus-client==0.19.0
+numpy==1.26.2
+
+# Performance & Optimization
+httpx==0.26.0
+orjson==3.9.10
+slowapi==0.1.9
+
 # Testing and quality dependencies
-pytest
-pytest-asyncio
-black
-flake8
+pytest==7.4.3
+pytest-asyncio==0.23.2
+black==23.12.1
+flake8==7.0.0

@@ -1,0 +1,108 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.fullWidth {
+    width: 100%;
+}
+
+.label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.inputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-family: var(--font-family-sans);
+    color: var(--color-text-primary);
+    background-color: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-base);
+    outline: none;
+}
+
+.input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.input:hover:not(:focus) {
+    border-color: var(--color-text-tertiary);
+}
+
+.input::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+.input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--color-surface-elevated);
+}
+
+.withLeftIcon {
+    padding-left: calc(var(--spacing-xl) + var(--spacing-md));
+}
+
+.withRightIcon {
+    padding-right: calc(var(--spacing-xl) + var(--spacing-md));
+}
+
+.iconLeft,
+.iconRight {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-tertiary);
+    pointer-events: none;
+}
+
+.iconLeft {
+    left: var(--spacing-md);
+}
+
+.iconRight {
+    right: var(--spacing-md);
+}
+
+.iconLeft svg,
+.iconRight svg {
+    width: 20px;
+    height: 20px;
+}
+
+.error {
+    border-color: var(--color-error);
+}
+
+.error:focus {
+    border-color: var(--color-error);
+    box-shadow: 0 0 0 3px hsla(0, 84%, 60%, 0.1);
+}
+
+.errorText {
+    font-size: var(--font-size-sm);
+    color: var(--color-error);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.helperText {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+}

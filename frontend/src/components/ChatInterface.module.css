@@ -1,0 +1,211 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 200px);
+    background: var(--color-surface);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.messagesContainer {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    padding: var(--spacing-xl);
+}
+
+.emptyIcon {
+    width: 64px;
+    height: 64px;
+    color: var(--color-text-tertiary);
+    margin-bottom: var(--spacing-md);
+}
+
+.emptyText {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    margin: 0 0 var(--spacing-sm) 0;
+}
+
+.emptySubtext {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin: 0;
+}
+
+.message {
+    display: flex;
+    animation: fadeInUp var(--transition-base) ease-out;
+}
+
+.message.user {
+    justify-content: flex-end;
+}
+
+.message.bot {
+    justify-content: flex-start;
+}
+
+.messageContent {
+    display: flex;
+    gap: var(--spacing-sm);
+    max-width: 70%;
+}
+
+.user .messageContent {
+    flex-direction: row-reverse;
+}
+
+.messageAvatar {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.user .messageAvatar {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.bot .messageAvatar {
+    background: var(--color-surface-elevated);
+    color: var(--color-text-secondary);
+}
+
+.messageAvatar svg {
+    width: 20px;
+    height: 20px;
+}
+
+.messageBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.user .messageBody {
+    align-items: flex-end;
+}
+
+.messageText {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    margin: 0;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.user .messageText {
+    background: var(--gradient-primary);
+    color: white;
+    border-bottom-right-radius: var(--radius-sm);
+}
+
+.bot .messageText {
+    background: var(--color-surface-elevated);
+    color: var(--color-text-primary);
+    border-bottom-left-radius: var(--radius-sm);
+}
+
+.messageTime {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    padding: 0 var(--spacing-sm);
+}
+
+.typing {
+    display: flex;
+    gap: 4px;
+    padding: var(--spacing-md);
+    background: var(--color-surface-elevated);
+    border-radius: var(--radius-lg);
+    border-bottom-left-radius: var(--radius-sm);
+}
+
+.typing span {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-text-tertiary);
+    animation: typing 1.4s infinite;
+}
+
+.typing span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+
+    0%,
+    60%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.7;
+    }
+
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+.inputContainer {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--color-surface-elevated);
+    border-top: 1px solid var(--color-border);
+}
+
+.input {
+    flex: 1;
+    padding: var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-family: var(--font-family-sans);
+    color: var(--color-text-primary);
+    background: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    resize: none;
+    outline: none;
+    transition: all var(--transition-base);
+    max-height: 120px;
+    min-height: 44px;
+}
+
+.input:focus {
+    border-color: var(--color-primary);
+}
+
+.input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .messageContent {
+        max-width: 85%;
+    }
+}

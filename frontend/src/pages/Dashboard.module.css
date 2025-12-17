@@ -1,0 +1,128 @@
+.dashboard {
+    animation: fadeInUp var(--transition-base) ease-out;
+}
+
+.header {
+    margin-bottom: var(--spacing-2xl);
+}
+
+.title {
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-bold);
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: var(--spacing-sm);
+}
+
+.subtitle {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-lg);
+}
+
+.statsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-2xl);
+}
+
+.statCard {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
+}
+
+.statIcon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.statIcon svg {
+    width: 28px;
+    height: 28px;
+    color: white;
+}
+
+.statIcon.blue {
+    background: linear-gradient(135deg, hsl(220, 90%, 56%), hsl(220, 90%, 46%));
+}
+
+.statIcon.purple {
+    background: linear-gradient(135deg, hsl(280, 85%, 60%), hsl(280, 85%, 50%));
+}
+
+.statIcon.green {
+    background: linear-gradient(135deg, hsl(142, 71%, 45%), hsl(142, 71%, 35%));
+}
+
+.statIcon.pink {
+    background: linear-gradient(135deg, hsl(340, 100%, 60%), hsl(340, 100%, 50%));
+}
+
+.statContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.statLabel {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: var(--font-weight-medium);
+}
+
+.statValue {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xl);
+}
+
+.uploadCard,
+.quickActions {
+    animation: fadeInUp var(--transition-slow) ease-out;
+}
+
+.sectionTitle {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-lg);
+}
+
+.actionButtons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+@media (max-width: 1024px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .statsGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .statCard {
+        flex-direction: row;
+    }
+}
