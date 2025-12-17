@@ -1,3 +1,7 @@
+import sys
+sys.path.insert(0, '.')
+sys.path.insert(0, '..')
+
 import logging
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,9 +9,9 @@ from fastapi.responses import JSONResponse
 from .health import router as health_router
 from .datasets import router as datasets_router
 from .models import router as models_router
-from .copilot import router as copilot_router
 from .visualizations import router as visualizations_router
-from .monitoring import router as monitoring_router
+# from .monitoring import router as monitoring_router
+# from .copilot import router as copilot_router
 from ..utils.config import settings
 
 # Configure logging
@@ -40,6 +44,16 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"}
     )
 
+# Root endpoint
+@app.get("/")
+async def root():
+    return {
+        "message": "Welcome to AI Decision Intelligence System API",
+        "version": settings.version,
+        "docs": "/docs",
+        "health": f"{settings.api_v1_prefix}/health"
+    }
+
 # Include routers
 app.include_router(
     health_router,
@@ -57,20 +71,20 @@ app.include_router(
     tags=["models"]
 )
 app.include_router(
-    copilot_router,
-    prefix=f"{settings.api_v1_prefix}/copilot",
-    tags=["copilot"]
-)
-app.include_router(
     visualizations_router,
     prefix=f"{settings.api_v1_prefix}/visualizations",
     tags=["visualizations"]
 )
-app.include_router(
-    monitoring_router,
-    prefix=f"{settings.api_v1_prefix}/monitoring",
-    tags=["monitoring"]
-)
+# app.include_router(
+#     monitoring_router,
+#     prefix=f"{settings.api_v1_prefix}/monitoring",
+#     tags=["monitoring"]
+# )
+# app.include_router(
+#     copilot_router,
+#     prefix=f"{settings.api_v1_prefix}/copilot",
+#     tags=["copilot"]
+# )
 
 @app.on_event("startup")
 async def startup_event():

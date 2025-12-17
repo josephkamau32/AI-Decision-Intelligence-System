@@ -3,12 +3,11 @@ from typing import Dict, Any
 from ..schemas.model import TrainRequest, TrainResponse, InferenceRequest, InferenceResponse, BatchInferenceRequest, BatchInferenceResponse
 from ..pipelines.ai_pipeline import AIPipeline
 from ..services.dataset_service import dataset_service
-from ..tasks import train_model_task
-from ..monitoring.monitoring_service import monitoring_service
+# from ..monitoring.monitoring_service import monitoring_service
 import mlflow
 from backend.utils.config import settings
 from mlops.registry.setup import register_model
-import shap
+# import shap
 import numpy as np
 import pandas as pd
 
@@ -18,6 +17,8 @@ class ModelService:
         self.models = {}  # Store model info: {'model': model, 'explainer': explainer, 'features': features, 'target': target, 'problem_type': problem_type}
 
     def initiate_training(self, request: TrainRequest) -> TrainResponse:
+        from ..tasks import train_model_task
+
         training_id = str(uuid.uuid4())
         dataset = next((d for d in dataset_service.datasets if d.id == request.dataset_id), None)
         if not dataset:
@@ -88,7 +89,7 @@ class ModelService:
         }
 
         # Monitor inference
-        monitoring_service.monitor_inference(request.model_id, request.input_data, pred_value)
+        # monitoring_service.monitor_inference(request.model_id, request.input_data, pred_value)
 
         return InferenceResponse(
             result=result,

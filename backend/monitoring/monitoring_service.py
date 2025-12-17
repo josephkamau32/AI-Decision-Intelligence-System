@@ -1,6 +1,6 @@
-from ...mlops.monitoring.drift_detector import DataDriftDetector
-from ...mlops.monitoring.prediction_monitor import PredictionDistributionMonitor
-from ...mlops.monitoring.performance_monitor import PerformanceMonitor
+import mlops.monitoring.drift_detector as drift_detector_module
+import mlops.monitoring.prediction_monitor as prediction_monitor_module
+import mlops.monitoring.performance_monitor as performance_monitor_module
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional
@@ -16,13 +16,13 @@ class MonitoringService:
     def initialize_model_monitoring(self, model_id: str, reference_data: pd.DataFrame, problem_type: str = 'classification'):
         """Initialize monitoring for a new model."""
         # Data drift detector
-        self.drift_detectors[model_id] = DataDriftDetector(reference_data, model_id)
+        self.drift_detectors[model_id] = drift_detector_module.DataDriftDetector(reference_data, model_id)
 
         # Prediction distribution monitor
-        self.prediction_monitors[model_id] = PredictionDistributionMonitor(model_id)
+        self.prediction_monitors[model_id] = prediction_monitor_module.PredictionDistributionMonitor(model_id)
 
         # Performance monitor
-        self.performance_monitors[model_id] = PerformanceMonitor(model_id, problem_type)
+        self.performance_monitors[model_id] = performance_monitor_module.PerformanceMonitor(model_id, problem_type)
 
         # Load existing state if available
         self._load_monitoring_state(model_id)

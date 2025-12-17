@@ -1,9 +1,11 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env")
+
     app_name: str = "AI Decision Intelligence System API"
-    debug: bool = False
+    debug_mode: bool = False
     version: str = "1.0.0"
     api_v1_prefix: str = "/api/v1"
 
@@ -30,8 +32,5 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/0"
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()
