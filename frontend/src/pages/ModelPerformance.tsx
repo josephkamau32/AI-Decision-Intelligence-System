@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastProvider';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 import SkeletonLoader from '../components/ui/SkeletonLoader';
 import styles from './ModelPerformance.module.css';
 
@@ -19,8 +22,19 @@ const ModelPerformance: React.FC = () => {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
+  const [showTrainModal, setShowTrainModal] = useState(false);
+  const [datasetId, setDatasetId] = useState('');
+  const [targetColumn, setTargetColumn] = useState('');
+  const [training, setTraining] = useState(false);
+
+  const navigate = useNavigate();
+  const { addToast } = useToast();
 
   useEffect(() => {
+    fetchModels();
+  }, []);
+
+  const fetchModels = () => {
     // Simulate loading models
     setTimeout(() => {
       setModels([
@@ -57,7 +71,41 @@ const ModelPerformance: React.FC = () => {
       ]);
       setLoading(false);
     }, 1000);
-  }, []);
+  };
+
+  const handleTrainModel = async () => {
+    if (!datasetId || !targetColumn) {
+      addToast('Please fill in all fields', 'error');
+      return;
+    }
+
+    setTraining(true);
+
+    try {
+      // TODO: Call actual API endpoint
+      // const response = await fetch('http://localhost:8000/api/v1/models/train', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     dataset_id: datasetId,
+      //     target_column: targetColumn,
+      //     task_type: 'auto'
+      //   })
+      // });
+
+      // Simulate training
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      addToast('Model training started! Check back soon for results.', 'success');
+      setShowTrainModal(false);
+      setDatasetId('');
+      setTargetColumn('');
+    } catch (error) {
+      addToast('Failed to start training', 'error');
+    } finally {
+      setTraining(false);
+    }
+  };
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return styles.scoreHigh;
@@ -72,13 +120,57 @@ const ModelPerformance: React.FC = () => {
           <h1 className={styles.title}>Model Performance</h1>
           <p className={styles.subtitle}>Monitor and compare your ML models</p>
         </div>
-        <Button variant="primary">
+        <Button variant="primary" onClick={() => setShowTrainModal(true)}>
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Train New Model
         </Button>
       </div>
+
+      {/* Training Modal */}
+      {showTrainModal && (
+        <div className={styles.modalOverlay} onClick={() => !training && setShowTrainModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Train New Model</h2>
+            <div className={styles.modalContent}>
+              <Input
+                label="Dataset ID"
+                value={datasetId}
+                onChange={(e) => setDatasetId(e.target.value)}
+                placeholder="Enter dataset ID"
+                disabled={training}
+              />
+              <Input
+                label="Target Column"
+                value={targetColumn}
+                onChange={(e) => setTargetColumn(e.target.value)}
+                placeholder="e.g., target, label, outcome"
+                disabled={training}
+              />
+              <p className={styles.modalHint}>
+                Tip: After uploading a dataset, you can find its ID in the Dataset Overview page.
+              </p>
+            </div>
+            <div className={styles.modalActions}>
+              <Button
+                variant="outline"
+                onClick={() => setShowTrainModal(false)}
+                disabled={training}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleTrainModel}
+                loading={training}
+              >
+                {training ? 'Starting...' : 'Start Training'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.grid}>
         {loading ? (
