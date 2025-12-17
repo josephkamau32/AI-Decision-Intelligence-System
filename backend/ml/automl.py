@@ -1,175 +1,291 @@
-from sklearn.model_selection import cross_val_score
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from xgboost import XGBClassifier, XGBRegressor
-from prophet import Prophet
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
-import numpy as np
 import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold, KFold
+from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge, Lasso
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from xgboost import XGBClassifier, XGBRegressor
+import joblib
 import mlflow
 import mlflow.sklearn
-import mlflow.pytorch
-from typing import List, Dict, Any
-from backend.utils.config import settings
+from typing import Dict, Any, List, Tuple
 import logging
+from datetime import datetime
+import os
+
+from ..ml.data_preprocessing import DataCleaner, FeatureEngineer
 
 logger = logging.getLogger(__name__)
 
-class LSTMModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(LSTMModel, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        out, _ = self.lstm(x)
-        out = self.fc(out[:, -1, :])
-        return out
-
-class AutoMLEngine:
-    def __init__(self):
-        self.models = {
-            'classification': [
-                ('LogisticRegression', LogisticRegression()),
-                ('RandomForest', RandomForestClassifier()),
-                ('XGBoost', XGBClassifier())
-            ],
-            'regression': [
-                ('LinearRegression', LinearRegression()),
-                ('RandomForest', RandomForestRegressor()),
-                ('XGBoost', XGBRegressor())
-            ],
-            'time_series': [
-                ('Prophet', Prophet),
-                ('LSTM', LSTMModel)
-            ]
-        }
-        logger.info("Initialized AutoMLEngine with available models")
-
-    def train_and_select(self, df: pd.DataFrame, target: str, problem_type: str) -> Dict[str, Any]:
-        logger.info(f"Starting AutoML training for {problem_type} problem with target {target}")
-        mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-        mlflow.set_experiment(settings.mlflow_experiment_name)
-        with mlflow.start_run():
-            mlflow.log_param("target", target)
-            mlflow.log_param("problem_type", problem_type)
-            mlflow.log_param("dataset_shape", df.shape)
-            if problem_type == 'time_series':
-                result = self._train_time_series(df, target)
-            else:
-                result = self._train_supervised(df, target, problem_type)
-            mlflow.log_metric("best_score", result['best_score'])
-            mlflow.log_param("best_model", result['best_model'])
-            # Log the model
-            if hasattr(result['trained_model'], 'predict'):  # sklearn-like
-                mlflow.sklearn.log_model(result['trained_model'], "model")
-            elif isinstance(result['trained_model'], torch.nn.Module):
-                mlflow.pytorch.log_model(result['trained_model'], "model")
-            else:
-                # For Prophet or others, perhaps save as artifact
-                import tempfile
-                import joblib
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    model_path = f"{tmpdir}/model.pkl"
-                    joblib.dump(result['trained_model'], model_path)
-                    mlflow.log_artifact(model_path, "model")
-            # Log all results as artifact
-            import json
-            results_summary = {res['model']: res['score'] for res in result['all_results']}
-            with tempfile.TemporaryDirectory() as tmpdir:
-                results_path = f"{tmpdir}/results.json"
-                with open(results_path, 'w') as f:
-                    json.dump(results_summary, f)
-                mlflow.log_artifact(results_path, "results")
-            result['run_id'] = mlflow.active_run().info.run_id
-            logger.info(f"AutoML training completed. Best model: {result['best_model']}, Score: {result['best_score']}")
-            return result
-
-    def _train_supervised(self, df: pd.DataFrame, target: str, problem_type: str) -> Dict[str, Any]:
-        logger.info(f"Training supervised models for {problem_type}")
-        X = df.drop(columns=[target]).values
-        y = df[target].values
-        results = []
-        for name, model in self.models[problem_type]:
-            scores = cross_val_score(model, X, y, cv=3, scoring='accuracy' if problem_type == 'classification' else 'neg_mean_squared_error')
-            mean_score = scores.mean()
-            results.append({
-                'model': name,
-                'score': mean_score,
-                'model_instance': model
-            })
-            logger.info(f"Model {name} scored {mean_score}")
-        # Sort by score descending for accuracy, ascending for mse (neg so higher better)
-        results.sort(key=lambda x: x['score'], reverse=True)
-        best = results[0]
-        # Fit best model
-        best['model_instance'].fit(X, y)
-        logger.info(f"Best model {best['model']} fitted")
+class AutoML:
+    """
+    Automated Machine Learning engine that trains and compares multiple models
+    """
+    
+    def __init__(self, task_type: str = 'auto', test_size: float = 0.2, random_state: int = 42):
+        """
+        Initialize AutoML engine
+        
+        Args:
+            task_type: 'classification', 'regression', or 'auto' (auto-detect)
+            test_size: Proportion of dataset to use for testing
+            random_state: Random seed for reproducibility
+        """
+        self.task_type = task_type
+        self.test_size = test_size
+        self.random_state = random_state
+        self.best_model = None
+        self.best_model_name = None
+        self.best_score = None
+        self.models = {}
+        self.results = {}
+        
+        logger.info(f"Initialized AutoML with task_type={task_type}, test_size={test_size}")
+    
+    def detect_task_type(self, y: pd.Series) -> str:
+        """Automatically detect if task is classification or regression"""
+        if self.task_type != 'auto':
+            return self.task_type
+        
+        # Check if target is numeric with many unique values
+        if y.dtype in ['int64', 'float64']:
+            unique_ratio = len(y.unique()) / len(y)
+            if unique_ratio > 0.05:  # More than 5% unique values suggests regression
+                logger.info("Auto-detected task type: regression")
+                return 'regression'
+        
+        logger.info("Auto-detected task type: classification")
+        return 'classification'
+    
+    def get_classification_models(self) -> Dict[str, Any]:
+        """Return dictionary of classification models to train"""
         return {
-            'best_model': best['model'],
-            'best_score': best['score'],
-            'trained_model': best['model_instance'],
-            'all_results': results
+            'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=1000),
+            'RandomForest': RandomForestClassifier(n_estimators=100, random_state=self.random_state, n_jobs=-1),
+            'XGBoost': XGBClassifier(random_state=self.random_state, n_jobs=-1, use_label_encoder=False, eval_metric='logloss'),
+            'GradientBoosting': GradientBoostingClassifier(random_state=self.random_state)
         }
-
-    def _train_time_series(self, df: pd.DataFrame, target: str) -> Dict[str, Any]:
-        logger.info("Training time series models")
-        # Assume df has 'ds' and 'y'
-        if 'ds' not in df.columns or 'y' not in df.columns:
-            # Fallback, assume first col date, last y
-            date_col = df.columns[0]
-            df = df.rename(columns={date_col: 'ds', target: 'y'})
-            df['ds'] = pd.to_datetime(df['ds'])
-        results = []
-        # Prophet
-        prophet = Prophet()
-        prophet.fit(df[['ds', 'y']])
-        # For scoring, predict on train or something, but simple, assume prophet is good
-        results.append({
-            'model': 'Prophet',
-            'score': 0.8,  # mock
-            'model_instance': prophet
-        })
-        logger.info("Prophet model trained")
-        # LSTM
-        # Create sequences
-        data = df['y'].values
-        seq_length = 10
-        X, y = [], []
-        for i in range(len(data) - seq_length):
-            X.append(data[i:i+seq_length])
-            y.append(data[i+seq_length])
-        X = np.array(X)
-        y = np.array(y)
-        X = torch.tensor(X, dtype=torch.float32).unsqueeze(-1)
-        y = torch.tensor(y, dtype=torch.float32)
-        dataset = TensorDataset(X, y)
-        dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-        model = LSTMModel(input_size=1, hidden_size=50, output_size=1)
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-        # Train for few epochs
-        for epoch in range(10):
-            for batch_X, batch_y in dataloader:
-                optimizer.zero_grad()
-                outputs = model(batch_X)
-                loss = criterion(outputs.squeeze(), batch_y)
-                loss.backward()
-                optimizer.step()
-        # Mock score
-        results.append({
-            'model': 'LSTM',
-            'score': 0.7,
-            'model_instance': model
-        })
-        logger.info("LSTM model trained")
-        results.sort(key=lambda x: x['score'], reverse=True)
-        best = results[0]
+    
+    def get_regression_models(self) -> Dict[str, Any]:
+        """Return dictionary of regression models to train"""
         return {
-            'best_model': best['model'],
-            'best_score': best['score'],
-            'trained_model': best['model_instance'],
-            'all_results': results
+            'LinearRegression': LinearRegression(),
+            'Ridge': Ridge(random_state=self.random_state),
+            'Lasso': Lasso(random_state=self.random_state),
+            'RandomForest': RandomForestRegressor(n_estimators=100, random_state=self.random_state, n_jobs=-1),
+            'XGBoost': XGBRegressor(random_state=self.random_state, n_jobs=-1),
+            'GradientBoosting': GradientBoostingRegressor(random_state=self.random_state)
         }
+    
+    def evaluate_classification(self, y_true, y_pred, y_prob=None) -> Dict[str, float]:
+        """Calculate classification metrics"""
+        metrics = {
+            'accuracy': float(accuracy_score(y_true, y_pred)),
+            'precision': float(precision_score(y_true, y_pred, average='weighted', zero_division=0)),
+            'recall': float(recall_score(y_true, y_pred, average='weighted', zero_division=0)),
+            'f1_score': float(f1_score(y_true, y_pred, average='weighted', zero_division=0))
+        }
+        
+        # Add ROC-AUC for binary classification
+        if len(np.unique(y_true)) == 2 and y_prob is not None:
+            try:
+                metrics['roc_auc'] = float(roc_auc_score(y_true, y_prob[:, 1]))
+            except:
+                pass
+        
+        return metrics
+    
+    def evaluate_regression(self, y_true, y_pred) -> Dict[str, float]:
+        """Calculate regression metrics"""
+        return {
+            'rmse': float(np.sqrt(mean_squared_error(y_true, y_pred))),
+            'mae': float(mean_absolute_error(y_true, y_pred)),
+            'r2_score': float(r2_score(y_true, y_pred)),
+            'mse': float(mean_squared_error(y_true, y_pred))
+        }
+    
+    def train_and_evaluate(
+        self, 
+        X_train, 
+        X_test, 
+        y_train, 
+        y_test, 
+        model_name: str, 
+        model: Any,
+        use_cv: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Train a single model and evaluate it
+        
+        Returns:
+            Dictionary containing model, metrics, and cross-validation scores
+        """
+        logger.info(f"Training {model_name}...")
+        
+        # Train model
+        model.fit(X_train, y_train)
+        
+        # Make predictions
+        y_pred = model.predict(X_test)
+        
+        # Calculate metrics
+        if self.task_type == 'classification':
+            y_prob = model.predict_proba(X_test) if hasattr(model, 'predict_proba') else None
+            metrics = self.evaluate_classification(y_test, y_pred, y_prob)
+            primary_metric = 'accuracy'
+        else:
+            metrics = self.evaluate_regression(y_test, y_pred)
+            primary_metric = 'r2_score'
+        
+        # Cross-validation
+        cv_scores = None
+        if use_cv:
+            try:
+                if self.task_type == 'classification':
+                    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.random_state)
+                    scoring = 'accuracy'
+                else:
+                    cv = KFold(n_splits=5, shuffle=True, random_state=self.random_state)
+                    scoring = 'r2'
+                
+                cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring, n_jobs=-1)
+                metrics['cv_mean'] = float(cv_scores.mean())
+                metrics['cv_std'] = float(cv_scores.std())
+                logger.info(f"{model_name} CV Score: {metrics['cv_mean']:.4f} (+/- {metrics['cv_std']:.4f})")
+            except Exception as e:
+                logger.warning(f"Cross-validation failed for {model_name}: {e}")
+        
+        logger.info(f"{model_name} {primary_metric}: {metrics[primary_metric]:.4f}")
+        
+        return {
+            'model': model,
+            'metrics': metrics,
+            'primary_score': metrics[primary_metric]
+        }
+    
+    def fit(
+        self, 
+        X: pd.DataFrame, 
+        y: pd.Series,
+        dataset_id: str = None,
+        experiment_name: str = "AutoML"
+    ) -> Dict[str, Any]:
+        """
+        Train multiple models and select the best one
+        
+        Args:
+            X: Feature dataset
+            y: Target variable
+            dataset_id: Optional dataset identifier
+            experiment_name: MLflow experiment name
+            
+        Returns:
+            Dictionary with best model info and all results
+        """
+        # Detect task type
+        self.task_type = self.detect_task_type(y)
+        
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=self.test_size, random_state=self.random_state,
+            stratify=y if self.task_type == 'classification' else None
+        )
+        
+        logger.info(f"Training set: {X_train.shape}, Test set: {X_test.shape}")
+        
+        # Get models based on task type
+        if self.task_type == 'classification':
+            models = self.get_classification_models()
+        else:
+            models = self.get_regression_models()
+        
+        # Set up MLflow
+        mlflow.set_experiment(experiment_name)
+        
+        # Train all models
+        results = {}
+        with mlflow.start_run(run_name=f"AutoML_{datetime.now().strftime('%Y%m%d_%H%M%S')}"):
+            # Log parameters
+            mlflow.log_param("task_type", self.task_type)
+            mlflow.log_param("test_size", self.test_size)
+            mlflow.log_param("n_features", X.shape[1])
+            mlflow.log_param("n_samples", X.shape[0])
+            if dataset_id:
+                mlflow.log_param("dataset_id", dataset_id)
+            
+            # Train each model
+            for model_name, model in models.items():
+                try:
+                    with mlflow.start_run(run_name=model_name, nested=True):
+                        result = self.train_and_evaluate(
+                            X_train, X_test, y_train, y_test, model_name, model
+                        )
+                        results[model_name] = result
+                        
+                        # Log to MLflow
+                        mlflow.log_params({f"{model_name}_param": str(model.get_params())})
+                        mlflow.log_metrics(result['metrics'])
+                        mlflow.sklearn.log_model(result['model'], model_name)
+                        
+                except Exception as e:
+                    logger.error(f"Failed to train {model_name}: {e}")
+                    continue
+            
+            # Select best model
+            if results:
+                self.best_model_name = max(results, key=lambda x: results[x]['primary_score'])
+                self.best_model = results[self.best_model_name]['model']
+                self.best_score = results[self.best_model_name]['primary_score']
+                
+                logger.info(f"Best model: {self.best_model_name} with score: {self.best_score:.4f}")
+                
+                # Log best model
+                mlflow.log_metric("best_score", self.best_score)
+                mlflow.log_param("best_model", self.best_model_name)
+                
+                # Register best model
+                model_uri = f"runs:/{mlflow.active_run().info.run_id}/{self.best_model_name}"
+                mlflow.register_model(model_uri, f"best_{self.task_type}_model")
+        
+        self.results = results
+        self.models = {name: res['model'] for name, res in results.items()}
+        
+        return {
+            'best_model': self.best_model_name,
+            'best_score': self.best_score,
+            'all_results': {name: res['metrics'] for name, res in results.items()},
+            'task_type': self.task_type
+        }
+    
+    def save_model(self, filepath: str):
+        """Save the best model to disk"""
+        if self.best_model is None:
+            raise ValueError("No model has been trained yet")
+        
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        joblib.dump(self.best_model, filepath)
+        logger.info(f"Model saved to {filepath}")
+    
+    def load_model(self, filepath: str):
+        """Load a model from disk"""
+        self.best_model = joblib.load(filepath)
+        logger.info(f"Model loaded from {filepath}")
+        return self.best_model
+    
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """Make predictions using the best model"""
+        if self.best_model is None:
+            raise ValueError("No model has been trained yet")
+        
+        return self.best_model.predict(X)
+    
+    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        """Get prediction probabilities (classification only)"""
+        if self.best_model is None:
+            raise ValueError("No model has been trained yet")
+        
+        if not hasattr(self.best_model, 'predict_proba'):
+            raise ValueError("Model does not support probability predictions")
+        
+        return self.best_model.predict_proba(X)
