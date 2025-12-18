@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
@@ -10,11 +11,18 @@ interface NavItem {
 
 const Sidebar: React.FC = () => {
     const location = useLocation();
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
 
     const navItems: NavItem[] = [
         {
-            path: '/',
+            path: '/dashboard',
             label: 'Dashboard',
             icon: (
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -112,17 +120,29 @@ const Sidebar: React.FC = () => {
             <div className={styles.footer}>
                 <div className={styles.footerContent}>
                     {!collapsed && (
-                        <div className={styles.userInfo}>
-                            <div className={styles.avatar}>
-                                <svg fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                        <>
+                            <div className={styles.userInfo}>
+                                <div className={styles.avatar}>
+                                    <svg fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div className={styles.userDetails}>
+                                    <div className={styles.userName}>{user?.username || 'User'}</div>
+                                    <div className={styles.userRole}>{user?.role || 'user'}</div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={handleLogout}
+                                className={styles.logoutButton}
+                                title="Logout"
+                            >
+                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                 </svg>
-                            </div>
-                            <div className={styles.userDetails}>
-                                <div className={styles.userName}>User</div>
-                                <div className={styles.userRole}>Administrator</div>
-                            </div>
-                        </div>
+                                <span>Logout</span>
+                            </button>
+                        </>
                     )}
                 </div>
             </div>

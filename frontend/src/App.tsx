@@ -1,11 +1,13 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeProvider';
 import { ToastProvider } from './context/ToastProvider';
+import { AuthProvider } from './context/AuthContext';
 import Layout from './components/Layout/Layout';
 import Toast from './components/ui/Toast';
 import Spinner from './components/ui/Spinner';
 import ErrorBoundary from './components/ErrorBoundary';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load pages for code splitting
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -14,6 +16,8 @@ const ModelPerformance = React.lazy(() => import('./pages/ModelPerformance'));
 const FeatureImportance = React.lazy(() => import('./pages/FeatureImportance'));
 const VisualInsights = React.lazy(() => import('./pages/VisualInsights'));
 const CopilotChat = React.lazy(() => import('./pages/CopilotChat'));
+const Login = React.lazy(() => import('./pages/Login'));
+const Register = React.lazy(() => import('./pages/Register'));
 
 // Loading fallback
 const PageLoader = () => (
@@ -32,21 +36,69 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <ToastProvider>
-          <Router>
-            <Layout>
+          <AuthProvider>
+            <Router>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/dataset-overview" element={<DatasetOverview />} />
-                  <Route path="/model-performance" element={<ModelPerformance />} />
-                  <Route path="/feature-importance" element={<FeatureImportance />} />
-                  <Route path="/visual-insights" element={<VisualInsights />} />
-                  <Route path="/copilot" element={<CopilotChat />} />
+                  {/* Public routes */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+
+                  {/* Protected routes */}
+                  <Route path="/" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Navigate to="/dashboard" replace />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Dashboard />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/dataset-overview" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <DatasetOverview />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/model-performance" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <ModelPerformance />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/feature-importance" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <FeatureImportance />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/visual-insights" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <VisualInsights />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/copilot" element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <CopilotChat />
+                      </Layout>
+                    </ProtectedRoute>
+                  } />
                 </Routes>
               </Suspense>
-            </Layout>
-            <Toast />
-          </Router>
+              <Toast />
+            </Router>
+          </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
     </ErrorBoundary>

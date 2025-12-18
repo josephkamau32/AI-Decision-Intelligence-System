@@ -14,11 +14,11 @@ const api: AxiosInstance = axios.create({
 // Request interceptor
 api.interceptors.request.use(
     (config) => {
-        // You can add auth tokens here in the future
-        // const token = localStorage.getItem('token');
-        // if (token) {
-        //   config.headers.Authorization = `Bearer ${token}`;
-        // }
+        // Add auth token to requests
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
         return config;
     },
     (error: AxiosError) => {
@@ -38,8 +38,12 @@ api.interceptors.response.use(
 
             switch (status) {
                 case 401:
-                    // Handle unauthorized - redirect to login in future
+                    // Handle unauthorized - redirect to login
                     console.error('Unauthorized access');
+                    localStorage.removeItem('auth_token');
+                    if (!window.location.pathname.includes('/login')) {
+                        window.location.href = '/login';
+                    }
                     break;
                 case 403:
                     console.error('Forbidden access');
