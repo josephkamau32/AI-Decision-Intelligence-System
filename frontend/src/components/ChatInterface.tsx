@@ -41,10 +41,10 @@ const ChatInterface: React.FC = () => {
     setLoading(true);
 
     try {
-      const answer = await askCopilot(input);
+      const response = await askCopilot(input);
       const botMessage: Message = {
         id: `bot-${Date.now()}`,
-        text: answer,
+        text: response.answer,
         sender: 'bot',
         timestamp: new Date()
       };
