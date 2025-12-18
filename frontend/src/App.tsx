@@ -10,6 +10,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load pages for code splitting
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const DatasetOverview = React.lazy(() => import('./pages/DatasetOverview'));
 const ModelPerformance = React.lazy(() => import('./pages/ModelPerformance'));
@@ -25,7 +26,8 @@ const PageLoader = () => (
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100vh'
+    height: '100vh',
+    background: 'var(--bg-secondary)'
   }}>
     <Spinner size="lg" />
   </div>
@@ -40,18 +42,12 @@ function App() {
             <Router>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  {/* Public routes */}
+                  {/* Public routes - Landing & Auth */}
+                  <Route path="/" element={<LandingPage />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
 
-                  {/* Protected routes */}
-                  <Route path="/" element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <Navigate to="/dashboard" replace />
-                      </Layout>
-                    </ProtectedRoute>
-                  } />
+                  {/* Protected routes - Dashboard */}
                   <Route path="/dashboard" element={
                     <ProtectedRoute>
                       <Layout>
