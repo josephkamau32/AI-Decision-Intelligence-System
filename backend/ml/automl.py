@@ -9,12 +9,14 @@ from xgboost import XGBClassifier, XGBRegressor
 import joblib
 import mlflow
 import mlflow.sklearn
-from typing import Dict, Any, List, Tuple
+import mlflow.pytorch
+from typing import Dict, Any, List, Tuple, Optional
 import logging
 from datetime import datetime
 import os
 
 from ..ml.data_preprocessing import DataCleaner, FeatureEngineer
+from ..ml.time_series import ProphetForecaster, LSTMForecaster, detect_time_series, calculate_forecast_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ class AutoML:
         Initialize AutoML engine
         
         Args:
-            task_type: 'classification', 'regression', or 'auto' (auto-detect)
+            task_type: 'classification', 'regression', 'time_series', or 'auto' (auto-detect)
             test_size: Proportion of dataset to use for testing
             random_state: Random seed for reproducibility
         """
@@ -40,13 +42,21 @@ class AutoML:
         self.best_score = None
         self.models = {}
         self.results = {}
+        self.date_column = None  # For time-series tasks
         
         logger.info(f"Initialized AutoML with task_type={task_type}, test_size={test_size}")
     
-    def detect_task_type(self, y: pd.Series) -> str:
-        """Automatically detect if task is classification or regression"""
+    def detect_task_type(self, X: pd.DataFrame, y: pd.Series) -> str:
+        """Automatically detect if task is classification, regression, or time-series"""
         if self.task_type != 'auto':
             return self.task_type
+        
+        # Check for time-series data
+        date_col = detect_time_series(X)
+        if date_col is not None:
+            self.date_column = date_col
+            logger.info(f"Auto-detected task type: time_series (date column: {date_col})")
+            return 'time_series'
         
         # Check if target is numeric with many unique values
         if y.dtype in ['int64', 'float64']:
@@ -76,6 +86,18 @@ class AutoML:
             'RandomForest': RandomForestRegressor(n_estimators=100, random_state=self.random_state, n_jobs=-1),
             'XGBoost': XGBRegressor(random_state=self.random_state, n_jobs=-1),
             'GradientBoosting': GradientBoostingRegressor(random_state=self.random_state)
+        }
+    
+    def get_timeseries_models(self) -> Dict[str, Any]:
+        """Return dictionary of time-series forecasting models to train"""
+        return {
+            'Prophet': ProphetForecaster(),
+            'LSTM': LSTMForecaster(
+                seq_length=10,
+                hidden_size=64,
+                epochs=50,  # Reduced for faster training
+                batch_size=32
+            )
         }
     
     def evaluate_classification(self, y_true, y_pred, y_prob=None) -> Dict[str, float]:
@@ -184,7 +206,11 @@ class AutoML:
             Dictionary with best model info and all results
         """
         # Detect task type
-        self.task_type = self.detect_task_type(y)
+        self.task_type = self.detect_task_type(X, y)
+        
+        # Handle time-series separately
+        if self.task_type == 'time_series':
+            return self._fit_timeseries(X, y, dataset_id, experiment_name)
         
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
@@ -289,3 +315,119 @@ class AutoML:
             raise ValueError("Model does not support probability predictions")
         
         return self.best_model.predict_proba(X)
+    
+    def _fit_timeseries(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        dataset_id: Optional[str] = None,
+        experiment_name: str = "AutoML_TimeSeries"
+    ) -> Dict[str, Any]:
+        """
+        Train time-series forecasting models
+        
+        Args:
+            X: Feature dataset (must include date column)
+            y: Target variable (time-series values)
+            dataset_id: Optional dataset identifier
+            experiment_name: MLflow experiment name
+            
+        Returns:
+            Dictionary with best model info and all results
+        """
+        if self.date_column is None:
+            raise ValueError("No date column detected for time-series task")
+        
+        logger.info(f"Training time-series models with {len(X)} samples")
+        
+        # Prepare data for time-series
+        df = X.copy()
+        df['target'] = y
+        
+        # Split data temporally (last test_size% for testing)
+        split_idx = int(len(df) * (1 - self.test_size))
+        df_train = df.iloc[:split_idx]
+        df_test = df.iloc[split_idx:]
+        
+        # Get time-series models
+        models = self.get_timeseries_models()
+        
+        # Set up MLflow
+        mlflow.set_experiment(experiment_name)
+        
+        results = {}
+        with mlflow.start_run(run_name=f"AutoML_TS_{datetime.now().strftime('%Y%m%d_%H%M%S')}"):
+            # Log parameters
+            mlflow.log_param("task_type", "time_series")
+            mlflow.log_param("test_size", self.test_size)
+            mlflow.log_param("n_samples", len(df))
+            mlflow.log_param("date_column", self.date_column)
+            if dataset_id:
+                mlflow.log_param("dataset_id", dataset_id)
+            
+            # Train each model
+            for model_name, model in models.items():
+                try:
+                    with mlflow.start_run(run_name=model_name, nested=True):
+                        logger.info(f"Training {model_name}...")
+                        
+                        # Train model
+                        if model_name == 'Prophet':
+                            model.fit(df_train, self.date_column, 'target')
+                            # Predict on test set
+                            forecast = model.predict(periods=len(df_test))
+                            y_pred = forecast['yhat'].tail(len(df_test)).values
+                        else:  # LSTM
+                            model.fit(df_train, self.date_column, 'target')
+                            # Get last sequence from training data
+                            last_seq = df_train['target'].tail(model.seq_length).values
+                            y_pred = model.predict(last_seq, periods=len(df_test))
+                        
+                        # Calculate metrics
+                        y_true = df_test['target'].values
+                        metrics = calculate_forecast_metrics(y_true, y_pred)
+                        
+                        # Store results
+                        results[model_name] = {
+                            'model': model,
+                            'metrics': metrics,
+                            'primary_score': -metrics['mape']  # Negative MAPE (lower is better, so negate for max)
+                        }
+                        
+                        # Log to MLflow
+                        mlflow.log_metrics(metrics)
+                        
+                        # Save model
+                        if model_name == 'Prophet':
+                            mlflow.sklearn.log_model(model.model, model_name)
+                        else:
+                            model.save_model(f"{model_name}_model.pt")
+                            mlflow.log_artifact(f"{model_name}_model.pt")
+                        
+                        logger.info(f"{model_name} MAPE: {metrics['mape']:.2f}%, RMSE: {metrics['rmse']:.4f}")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to train {model_name}: {e}")
+                    continue
+            
+            # Select best model (lowest MAPE)
+            if results:
+                self.best_model_name = max(results, key=lambda x: results[x]['primary_score'])
+                self.best_model = results[self.best_model_name]['model']
+                self.best_score = results[self.best_model_name]['metrics']['mape']
+                
+                logger.info(f"Best model: {self.best_model_name} with MAPE: {self.best_score:.2f}%")
+                
+                # Log best model
+                mlflow.log_metric("best_mape", self.best_score)
+                mlflow.log_param("best_model", self.best_model_name)
+        
+        self.results = results
+        self.models = {name: res['model'] for name, res in results.items()}
+        
+        return {
+            'best_model': self.best_model_name,
+            'best_score': self.best_score,
+            'all_results': {name: res['metrics'] for name, res in results.items()},
+            'task_type': 'time_series'
+        }
