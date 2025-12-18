@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-backend
+  labels:
+    app: ai-backend
+    component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ai-backend
+  template:
+    metadata:
+      labels:
+        app: ai-backend
+        component: backend
+    spec:
+      containers:
+      - name: backend
+        image: ${CONTAINER_REGISTRY}/ai-backend:${VERSION}
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: DEBUG_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: ai-config
+              key: debug_mode
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: ai-secrets
+              key: database_url
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: MLFLOW_TRACKING_URI
+          value: "http://mlflow-service:5000"
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-secrets
+              key: secret_key
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-secrets
+              key: jwt_secret_key
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-secrets
+              key: openai_api_key
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads
+        - name: models
+          mountPath: /app/models
+      volumes:
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: uploads-pvc
+      - name: models
+        persistentVolumeClaim:
+          claimName: models-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  labels:
+    app: ai-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: ai-backend

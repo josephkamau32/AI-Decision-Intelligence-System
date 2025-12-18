@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-config
+data:
+  debug_mode: "false"
+  allowed_origins: "https://yourdomain.com,https://www.yourdomain.com"
+  jwt_expiration_minutes: "30"
+  jwt_algorithm: "HS256"
+  prometheus_enabled: "true"
