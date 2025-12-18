@@ -1,364 +1,593 @@
-# AI Decision Intelligence System
+# 🚀 AI Decision Intelligence Platform
 
-A production-grade, scalable AI Decision Intelligence Platform with AutoML, real-time inference, SHAP explainability, and AI Copilot.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![React 18](https://img.shields.io/badge/react-18-blue.svg)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)](https://www.typescriptlang.org/)
 
-## 🎯 Overview
+> **Transform Raw Data into Intelligent Decisions with AI**
 
-This platform enables users to:
-- **Upload datasets** (CSV, Excel, JSON, Parquet)
-- **Auto-profile data** with quality analysis
-- **Train ML models** using AutoML (10+ algorithms)
-- **Make predictions** (single & batch)
-- **Explain results** using SHAP
-- **Chat with AI Copilot** for data insights
+An enterprise-grade, production-ready analytics platform that automates machine learning workflows, provides natural language insights through AI copilot, and delivers explainable predictions with zero code required.
+
+![AI Decision Intelligence Platform](https://img.shields.io/badge/Status-Production%20Ready-success)
+
+---
+
+## ✨ Features
+
+### 🤖 **AutoML & Intelligent Forecasting**
+- **12+ ML Algorithms**: Automatic model selection (RandomForest, XGBoost, LightGBM, CatBoost, etc.)
+- **Time-Series Forecasting**: Prophet for trend analysis, LSTM for complex patterns
+- **Hyperparameter Tuning**: Optuna-powered optimization for peak performance
+- **Auto Task Detection**: Automatically identifies regression, classification, or time-series tasks
+
+### 📊 **Data Analytics**
+- **Automated Data Profiling**: Instant insights into distributions, correlations, and anomalies
+- **Interactive Visualizations**: Plot.ly-powered charts, distributions, and feature importance
+- **Dataset Management**: Upload CSV, Excel, Parquet files with drag-and-drop
+- **Data Quality Checks**: Missing values, outliers, and data drift detection
+
+### 🧠 **AI Copilot**
+- **Natural Language Queries**: Ask questions about your data in plain English
+- **Contextual Insights**: Get explanations, recommendations, and predictions
+- **Conversation History**: Maintain context across multiple questions
+- **Confidence Scoring**: Know how reliable each answer is
+
+### 🔍 **Explainable AI**
+- **SHAP Values**: Understand which features drive predictions
+- **Feature Importance**: Ranked list of most impactful variables
+- **Decision Paths**: Visualize how models make decisions
+- **Model Interpretation**: Trust through transparency
+
+### 🏢 **Enterprise-Grade Infrastructure**
+- **Kubernetes Ready**: Complete deployment manifests with auto-scaling
+- **CI/CD Pipelines**: GitHub Actions for automated testing and deployment
+- **Monitoring & Observability**: Prometheus metrics + Grafana dashboards
+- **Authentication & RBAC**: JWT-based auth with role-based access control
+- **API Rate Limiting**: Protect against abuse with configurable limits
+
+### 🎨 **Modern User Interface**
+- **Professional Landing Page**: Clear value proposition and feature showcase
+- **Responsive Design**: Works on desktop, tablet, and mobile
+- **Dark/Light Mode**: User preference support
+- **WCAG AA Compliant**: Accessible to all users
+- **Enterprise Aesthetics**: Rivals Power BI and Tableau in visual quality
+
+---
 
 ## 🏗️ Architecture
 
-- **Frontend**: React + TypeScript, modern UI with dark/light themes
-- **Backend**: FastAPI, async endpoints, MLflow integration
-- **ML Engine**: Scikit-learn, XGBoost, LightGBM, SHAP
-- **MLOps**: MLflow for experiments, Celery for async tasks, Redis for caching
-- **Deployment**: Docker containers, Docker Compose
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Frontend (React + TypeScript)           │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ Landing  │  │   Auth   │  │Dashboard │  │ Copilot  │   │
+│  │   Page   │  │  Pages   │  │  & Data  │  │   Chat   │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Backend (FastAPI + Python)                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ AutoML   │  │ Time-    │  │   AI     │  │  Auth &  │   │
+│  │ Pipeline │  │ Series   │  │ Copilot  │  │   RBAC   │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Infrastructure & Services                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ MLflow   │  │  Redis   │  │Prometheus│  │ Grafana  │   │
+│  │(Models)  │  │ (Queue)  │  │(Metrics) │  │(Dashboards)  │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Technology Stack
+
+**Frontend:**
+- React 18 with TypeScript
+- React Router for SPA navigation
+- Plotly.js for interactive charts
+- CSS Modules with design tokens
+- Axios for API communication
+
+**Backend:**
+- FastAPI (Python 3.11+)
+- Scikit-learn, XGBoost, LightGBM, CatBoost
+- Prophet & PyTorch (LSTM)
+- Optuna for hyperparameter tuning
+- SHAP for model explainability
+- OpenAI API for copilot functionality
+
+**Infrastructure:**
+- Kubernetes for orchestration
+- Docker for containerization
+- GitHub Actions for CI/CD
+- Prometheus + Grafana for monitoring
+- MLflow for experiment tracking
+- Redis for task queuing
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- **Python 3.11+**
+- **Node.js 18+** and npm
+- **Git**
 
-- Python 3.10+
-- Node 18+
-- Redis (optional, for caching)
-- Docker & Docker Compose (for containerized deployment)
+### Local Development
 
-### Option 1: Local Development
-
-#### Backend Setup
-
+#### 1. Clone the Repository
 ```bash
-cd backend
+git clone https://github.com/josephkamau32/AI-Decision-Intelligence-System.git
+cd AI-Decision-Intelligence-System
+```
 
+#### 2. Setup Backend
+```bash
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\\Scripts\\activate
+python -m venv .venv
+
+# Activate (Windows)
+.venv\Scripts\activate
+# Activate (Mac/Linux)
+source .venv/bin/activate
 
 # Install dependencies
+cd backend
 pip install -r requirements.txt
 
 # Set environment variables
-cp .env.example .env
-# Edit .env with your configuration
+copy .env.example .env  # Windows
+cp .env.example env    # Mac/Linux
 
-# Run backend
-uvicorn api.main:app --reload --port 8000
+# Edit .env with your configuration
+# Required: SECRET_KEY, JWT_SECRET_KEY, OPEN
+
+AI_API_KEY
+
+# Run backend server
+cd ..
+.venv\Scripts\python.exe -m uvicorn backend.api.main:app --reload --port 8000
 ```
 
-#### Frontend Setup
+Backend will be available at: **http://localhost:8000**
+- API Docs: http://localhost:8000/docs
+- Metrics: http://localhost:8000/metrics
 
+#### 3. Setup Frontend
 ```bash
+# In a new terminal
 cd frontend
 
 # Install dependencies
-npm install
+npm install --legacy-peer-deps
 
 # Set environment variables
-cp .env.example .env
-# Edit .env (set REACT_APP_API_URL=http://localhost:8000)
+copy .env.example .env  # Windows
+cp .env.example .env    # Mac/Linux
 
-# Run frontend
-PORT=3001 npm start
+# Edit .env
+# REACT_APP_API_URL=http://localhost:8000
 
-# Or on Windows:
-$env:PORT=3001; npm start
+# Run frontend server
+npm start
 ```
 
-Access the app at: **http://localhost:3001**
+Frontend will be available at: **http://localhost:3000**
 
-### Option 2: Docker Compose (Full Stack)
+#### 4. First-Time Setup
+1. Open http://localhost:3000 in your browser
+2. Click **"Get Started Free"**
+3. Register a new account
+4. You'll be auto-logged in and redirected to the dashboard
 
+---
+
+## 📖 User Guide
+
+### Getting Started
+
+#### 1. Upload Your First Dataset
+- Navigate to **Dashboard**
+- Use the **Upload Dataset** card
+- Drag & drop a CSV, Excel, or Parquet file
+- Or click to browse files
+
+**Supported Formats:**
+- CSV (`.csv`)
+- Excel (`.xlsx`, `.xls`)
+- Parquet (`.parquet`)
+
+#### 2. View Dataset Insights
+- Go to **Datasets** page
+- Click on your uploaded dataset
+- See automatic profiling:
+  - Data quality metrics
+  - Missing values analysis
+  - Distributions and correlations
+  - Feature types identification
+
+#### 3. Train ML Models
+- Select your dataset
+- Choose target column (what to predict)
+- Choose task type or let AutoML detect it:
+  - **Classification**: Predict categories
+  - **Regression**: Predict numbers
+  - **Time-Series**: Predict future values
+- Click **Train Model**
+- AutoML will:
+  - Try 12+ algorithms automatically
+  - Tune hyperparameters
+  - Select the best model
+  - Provide performance metrics
+
+#### 4. Analyze Model Performance
+- Go to **Models** page
+- View accuracy, precision, recall, F1-score
+- See confusion matrices (classification)
+- Check R² score and MAE (regression)
+- View prediction charts (time-series)
+
+#### 5. Understand Predictions (Explainability)
+- Go to **Features** page
+- View SHAP values for feature importance
+- See which features drive predictions
+- Understand model decision-making
+
+#### 6. Ask AI Copilot
+- Go to **AI Copilot** page
+- Ask questions like:
+  - "What are the key drivers of customer churn?"
+  - "Forecast sales for next quarter"
+  - "Which features are most important?"
+  - "Explain this prediction"
+- Get natural language answers with confidence scores
+
+---
+
+## 🔐 Authentication & Security
+
+### User Roles
+- **Admin**: Full access, user management
+- **User**: Standard access, can train models
+- **Viewer**: Read-only access
+
+### API Authentication
 ```bash
-# Build and run all services
-docker-compose up --build
-
-# Access:
-# - Frontend: http://localhost:3000
-# - Backend API: http://localhost:8000
-# - API Docs: http://localhost:8000/docs
-# - MLflow UI: http://localhost:5000
-```
-
-## 📁 Project Structure
-
-```
-├── frontend/                # React TypeScript app
-│   ├── src/
-│   │   ├── components/      # UI components
-│   │   ├── pages/           # Page components
-│   │   ├── context/         # React contexts
-│   │   ├── services/        # API services
-│   │   └── styles/          # CSS and design system
-│   └── Dockerfile
-├── backend/                 # FastAPI backend
-│   ├── api/                 # API routes
-│   ├── ml/                  # ML engine
-│   │   ├── automl.py        # AutoML training
-│   │   ├── inference.py     # Predictions
-│   │   ├── explainability.py # SHAP
-│   │   └── data_*.py        # Data processing
-│   ├── services/            # Business logic
-│   ├── tasks.py             # Celery async tasks
-│   ├── copilot/             # AI Copilot tools
-│   └── Dockerfile
-└── docker-compose.yml       # Full stack deployment
-```
-
-## 🔧 Key Features
-
-### 1. AutoML Training
-
-Train models automatically with 10+ algorithms:
-- **Classification**: Logistic Regression, Random Forest, XGBoost, LightGBM, Gradient Boosting
-- **Regression**: Linear, Ridge, Lasso, Random Forest, XGBoost, Gradient Boosting
-
-```bash
-POST /api/v1/models/train
+# Register
+POST /api/v1/auth/register
 {
-  "dataset_id": "dataset_123",
-  "target_column": "target",
-  "task_type": "auto",
-  "test_size": 0.2
-}
-```
-
-### 2. Inference
-
-Make predictions:
-
-```bash
-# Single prediction
-POST /api/v1/models/predict
-{
-  "model_id": "model_123",
-  "data": {"feature1": 10, "feature2": 20}
-}
-
-# Batch predictions
-POST /api/v1/models/predict/batch
-{
-  "model_id": "model_123",
-  "data": [{"feature1": 10}, {"feature1": 15}]
-}
-```
-
-### 3. Explainability (SHAP)
-
-Understand model decisions:
-
-```bash
-# Global feature importance
-GET /api/v1/models/{model_id}/explain/global?top_n=10
-
-# Explain specific prediction
-POST /api/v1/models/{model_id}/explain/local
-{
-  "instance": {"feature1": 10, "feature2": 20}
+  "username": "yourname",
+  "email": "your@email.com",
+  "password": "SecurePassword123!"
 }
 
-# Get SHAP plots
-GET /api/v1/models/{model_id}/explain/plots?plot_type=summary
+# Login
+POST /api/v1/auth/login
+{
+  "username": "yourname",
+  "password": "SecurePassword123!"
+}
+
+# Returns JWT token
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+  "token_type": "bearer"
+}
+
+# Use token in headers
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 ```
 
-### 4. Data Profiling
+### Security Features
+- ✅ JWT tokens with 30-minute expiry
+- ✅ Password hashing with bcrypt
+- ✅ Role-based access control (RBAC)
+- ✅ API rate limiting (60 req/min default)
+- ✅ CORS protection
+- ✅ Input validation
+- ✅ SQL injection prevention
 
-Auto-analyze datasets:
-- Auto-detect column types
-- Suggest target variable
-- Identify outliers
-- Find quality issues
-
-## 📊 API Documentation
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-### Main Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/datasets/upload` | POST | Upload dataset |
-| `/api/v1/datasets/` | GET | List datasets (paginated) |
-| `/api/v1/models/train` | POST | Train AutoML model |
-| `/api/v1/models/tasks/{task_id}/status` | GET | Check training status |
-| `/api/v1/models/predict` | POST | Single prediction |
-| `/api/v1/models/predict/batch` | POST | Batch predictions |
-| `/api/v1/models/{id}/explain/global` | GET | Feature importance |
-| `/api/v1/models/{id}/explain/local` | POST | Explain prediction |
+---
 
 ## 🧪 Testing
 
+### Backend Tests
 ```bash
 cd backend
-
-# Run all tests
-pytest
-
-# Run specific test file
-pytest tests/test_ml_core.py -v
-
-# With coverage
-pytest --cov=ml --cov-report=html
+pytest tests/ -v --cov=api --cov=ml
 ```
 
-## 🌟 Features Implemented
-
-### Core ML
-- ✅ AutoML with 10+ models
-- ✅ Auto task detection (classification/regression)
-- ✅ Cross-validation
-- ✅ MLflow experiment tracking
-- ✅ Model versioning & registry
-
-### Inference
-- ✅ Real-time predictions
-- ✅ Batch predictions
-- ✅ Confidence scores
-- ✅ Model loading (file, MLflow, URI)
-
-### Explainability
-- ✅ SHAP global importance
-- ✅ SHAP local explanations
-- ✅ Summary plots
-- ✅ Feature importance charts
-
-### Frontend
-- ✅ Modern UI with dark/light themes
-- ✅ Responsive design
-- ✅ Dashboard with stats
-- ✅ Model performance visualization
-- ✅ Feature importance charts
-- ✅ AI Copilot chat interface
-- ✅ Drag-and-drop upload
-
-### Backend
-- ✅ Async background tasks (Celery)
-- ✅ Rate limiting
-- ✅ Request logging
-- ✅ Security headers
-- ✅ Redis caching
-- ✅ Input validation
-- ✅ Comprehensive error handling
-
-## 🔒 Security
-
-- CORS configuration (env-based)
-- Rate limiting (60 req/min)
-- Input validation & sanitization
-- Security headers (XSS, clickjacking protection)
-- Auto-generated secure secrets
-
-## 📝 Environment Variables
-
-### Backend (.env)
-
-```env
-DEBUG_MODE=true
-DATABASE_URL=postgresql://user:pass@localhost/db
-REDIS_URL=redis://localhost:6379/0
-MLFLOW_TRACKING_URI=http://localhost:5000
-SECRET_KEY=auto-generated
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
-```
-
-### Frontend (.env)
-
-```env
-REACT_APP_API_URL=http://localhost:8000
-PORT=3001
-```
-
-## 🚢 Deployment
-
-### Production Build
-
+### Frontend Tests
 ```bash
-# Frontend
 cd frontend
-npm run build
-
-# Serve with nginx or serve
-npx serve -s build
-
-# Backend
-cd backend
-uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
+npm test
 ```
 
-### Docker Deployment
+### Comprehensive Testing Guide
+See [testing_guide.md](.gemini/antigravity/brain/02d93139-4bcb-4961-98fa-2d04ceef996e/testing_guide.md) for detailed testing procedures.
 
+---
+
+## 🐳 Docker Deployment
+
+### Build Images
 ```bash
-# Build images
-docker-compose build
+# Backend
+docker build -t ai-decision-backend:latest ./backend
 
-# Run in production mode
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+# Frontend
+docker build -t ai-decision-frontend:latest ./frontend
 ```
+
+### Run with Docker Compose
+```bash
+docker-compose up -d
+```
+
+Services:
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- MLflow: http://localhost:5000
+- Grafana: http://localhost:3001
+
+---
+
+## ☸️ Kubernetes Deployment
+
+### Prerequisites
+- Kubernetes cluster (GKE, EKS, AKS, or local with minikube)
+- kubectl configured
+- Docker images pushed to registry
+
+### Quick Deploy
+```bash
+# 1. Create secrets
+kubectl create secret generic ai-secrets \
+  --from-literal=secret_key=$(openssl rand -hex 32) \
+  --from-literal=jwt_secret_key=$(openssl rand -hex 32) \
+  --from-literal=openai_api_key=your-openai-key
+
+# 2. Apply manifests
+kubectl apply -f k8s/
+
+# 3. Check status
+kubectl get pods
+kubectl get services
+
+# 4. Access application
+kubectl port-forward svc/frontend-service 3000:80
+```
+
+### Detailed Guide
+See [k8s/README.md](k8s/README.md) for comprehensive Kubernetes deployment instructions.
+
+---
+
+## 📊 Monitoring
+
+### Prometheus Metrics
+Available at: http://localhost:8000/metrics
+
+**Key Metrics:**
+- `http_requests_total` - Total HTTP requests
+- `http_request_duration_seconds` - Request latency
+- `ml_training_duration_seconds` - Model training time
+- `ml_model_accuracy` - Model performance
+- `ml_predictions_total` - Prediction count
+- `data_drift_detected` - Drift detection events
+
+### Grafana Dashboards
+Access Grafana at: http://localhost:3001
+- Default credentials: `admin` / `admin`
+- Pre-configured dashboard: **ML Operations**
+
+**Dashboard Panels:**
+- HTTP Request Rate & Latency
+- Model Training Duration
+- Prediction Accuracy Trends
+- Data Drift Alerts
+- System Resource Usage
+
+---
 
 ## 🛠️ Development
 
-### Running Celery Worker
-
-```bash
-cd backend
-celery -A celery_app worker --loglevel=info
+### Project Structure
+```
+AI-Decision-Intelligence-System/
+├── backend/                 # FastAPI backend
+│   ├── api/                # API routes
+│   ├── ml/                 # ML pipelines
+│   ├── schemas/            # Pydantic models
+│   ├── services/           # Business logic
+│   ├── utils/              # Utilities
+│   └── requirements.txt    # Python deps
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── pages/          # Page components
+│   │   ├── components/     # Reusable components
+│   │   ├── context/        # React context
+│   │   ├── services/       # API services
+│   │   └── styles/         # CSS & design tokens
+│   └── package.json        # npm deps
+├── k8s/                    # Kubernetes manifests
+├── grafana/                # Grafana dashboards
+├── .github/workflows/      # CI/CD pipelines
+└── docker-compose.yml      # Local deployment
 ```
 
-### MLflow UI
+### Design System
+The UI uses a comprehensive design system with:
+- **WCAG AA Compliant Colors**
+- **Typography Scale** (Inter + Poppins)
+- **8px Spacing System**
+- **Semantic Tokens**
+- **Responsive Breakpoints**
 
+See `frontend/src/styles/design-tokens.css` for all variables.
+
+### Contributing
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+---
+
+## 📝 API Documentation
+
+### Interactive API Docs
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### Key Endpoints
+
+#### Datasets
 ```bash
-mlflow ui --port 5000
+# Upload dataset
+POST /api/v1/datasets/upload
+
+# List datasets
+GET /api/v1/datasets
+
+# Get dataset details
+GET /api/v1/datasets/{dataset_id}
+
+# Delete dataset
+DELETE /api/v1/datasets/{dataset_id}
 ```
 
-## 📚 Documentation
+#### Models
+```bash
+# Train model
+POST /api/v1/models/train
 
-- [Implementation Plan](docs/implementation_plan.md)
-- [Gap Analysis](docs/gap_analysis.md)
-- [Walkthrough](docs/walkthrough.md)
-- [API Reference](http://localhost:8000/docs)
+# List models
+GET /api/v1/models
 
-## 🤝 Contributing
+# Get model details
+GET /api/v1/models/{model_id}
 
-This is a production-ready AI platform. Future enhancements:
-- [ ] Advanced hyperparameter tuning (Optuna)
-- [ ] Time-series models (Prophet, LSTM)
-- [ ] Model monitoring & drift detection
-- [ ] Complete LLM Copilot integration
-- [ ] Kubernetes deployment manifests
-- [ ] CI/CD pipeline
+# Make prediction
+POST /api/v1/models/{model_id}/predict
+```
 
-## 📊 Status
+#### AI Copilot
+```bash
+# Ask question
+POST /api/v1/copilot/ask
+{
+  "question": "What drives customer churn?",
+  "dataset_id": "optional-dataset-id",
+  "model_id": "optional-model-id"
+}
+```
 
-- **Core ML**: 100% ✅
-- **Frontend UI**: 95% ✅
-- **Backend API**: 90% ✅
-- **Production Ready**: 75% ⚠️
+---
+
+## 🐛 Troubleshooting
+
+### Backend won't start
+```bash
+# Check Python version
+python --version  # Should be 3.11+
+
+# Reinstall dependencies
+pip install --upgrade -r backend/requirements.txt
+
+# Check virtual environment
+which python  # Should point to .venv
+
+# Check port availability
+lsof -i :8000  # Mac/Linux
+netstat -ano | findstr :8000  # Windows
+```
+
+### Frontend won't compile
+```bash
+# Clear cache
+rm -rf node_modules package-lock.json
+npm install --legacy-peer-deps
+
+# Check Node version
+node --version  # Should be 18+
+
+# Clear browser cache
+# Use incognito mode or Ctrl+Shift+Delete
+```
+
+### Models not training
+- Check dataset format (CSV must have header row)
+- Verify target column exists
+- Ensure sufficient data (minimum 10 rows)
+- Check backend logs for errors
+
+### AI Copilot not responding
+- Verify OPENAI_API_KEY in backend `.env`
+- Check API quota/billing
+- View backend logs for API errors
+
+---
+
+## 📚 Additional Resources
+
+- **Implementation Plan**: `.gemini/antigravity/brain/.../implementation_plan.md`
+- **Walkthrough**: `.gemini/antigravity/brain/.../walkthrough.md`
+- **Testing Guide**: `.gemini/antigravity/brain/.../testing_guide.md`
+- **UI Redesign Summary**: `.gemini/antigravity/brain/.../ui_redesign_summary.md`
+
+---
 
 ## 📄 License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Credits
+---
 
-Built with:
-- FastAPI
-- React
-- Scikit-learn
-- XGBoost
-- LightGBM
-- SHAP
-- MLflow
-- Celery
-- Redis
+## 🙏 Acknowledgments
+
+**Technologies Used:**
+- FastAPI for high-performance API
+- React for modern UI
+- Scikit-learn for ML algorithms
+- Prophet for time-series forecasting
+- SHAP for explainability
+- OpenAI for natural language understanding
+- Kubernetes for orchestration
+- Prometheus & Grafana for monitoring
+
+---
+
+## 📞 Support
+
+**Issues**: [GitHub Issues](https://github.com/josephkamau32/AI-Decision-Intelligence-System/issues)
+
+**Questions**: Open a discussion on GitHub
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Real-time model retraining
+- [ ] Multi-user collaboration
+- [ ] Advanced data preprocessing
+- [ ] Custom model deployment
+- [ ] Mobile app (React Native)
+- [ ] Streaming data support
+- [ ] Advanced NLP models
+- [ ] Computer vision support
+
+---
+
+<div align="center">
+
+**Built with ❤️ for Data Teams Worldwide**
+
+[⬆ Back to Top](#-ai-decision-intelligence-platform)
+
+</div>
