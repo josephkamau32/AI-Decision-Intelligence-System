@@ -7,13 +7,14 @@ from ..visualizations import (
     ForecastPlot,
     InteractiveFilters
 )
-from ..ml.data_ingestion import DataIngestion
+# from ..ml.data_ingestion import DataIngestion  # TODO: Create DataIngestion class
 from .dataset_service import dataset_service
 from .model_service import model_service
 
 class VisualizationService:
     def __init__(self):
-        self.data_ingestion = DataIngestion()
+        # self.data_ingestion = DataIngestion()  # TODO: Create DataIngestion class
+        pass
 
     def get_correlation_heatmap(self, dataset_id: str) -> Optional[Dict[str, Any]]:
         dataset = next((d for d in dataset_service.datasets if d.id == dataset_id), None)

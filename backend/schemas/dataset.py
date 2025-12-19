@@ -6,6 +6,16 @@ class DatasetUploadRequest(BaseModel):
     name: str = Field(..., min_length=3, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
 
+class DatasetInfo(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    file_path: str
+    created_at: datetime
+    size: int = 0
+    rows: int = 0
+    columns: int = 0
+
 class DatasetResponse(BaseModel):
     id: str
     name: str

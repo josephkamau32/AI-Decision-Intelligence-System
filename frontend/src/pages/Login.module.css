@@ -65,7 +65,7 @@
 .authDescription {
     font-size: var(--text-lg);
     line-height: var(--leading-relaxed);
-    opacity: 0.95;
+    opacity: 1;
     max-width: 90%;
 }
 
