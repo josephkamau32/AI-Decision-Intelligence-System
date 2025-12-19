@@ -91,7 +91,7 @@
 
 .statLabel {
     font-size: var(--text-sm);
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     font-weight: var(--font-medium);
     margin-bottom: var(--spacing-1);
     text-transform: uppercase;

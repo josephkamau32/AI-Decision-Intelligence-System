@@ -47,7 +47,7 @@
 
 .emptySubtext {
     font-size: var(--text-base);
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     max-width: 400px;
 }
 
@@ -133,7 +133,7 @@
 
 .messageTime {
     font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     padding: 0 var(--spacing-2);
 }
 
@@ -197,7 +197,7 @@
 }
 
 .input::placeholder {
-    color: var(--text-tertiary);
+    color: var(--input-placeholder);
 }
 
 .input:disabled {

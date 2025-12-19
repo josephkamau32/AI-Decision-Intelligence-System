@@ -44,7 +44,7 @@
 }
 
 .input::placeholder {
-    color: var(--color-text-tertiary);
+    color: var(--input-placeholder);
 }
 
 .input:disabled {
@@ -67,7 +67,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-tertiary);
+    color: var(--text-secondary);
     pointer-events: none;
 }
 
@@ -104,5 +104,5 @@
 
 .helperText {
     font-size: var(--font-size-sm);
-    color: var(--color-text-tertiary);
+    color: var(--text-secondary);
 }

@@ -263,7 +263,7 @@
     align-items: center;
     gap: var(--spacing-4);
     margin: var(--spacing-6) 0;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     font-size: var(--text-sm);
 }
 

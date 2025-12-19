@@ -80,7 +80,7 @@
 
 .metricLabel {
     font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: var(--font-weight-medium);
@@ -115,7 +115,7 @@
 
 .trainedDate {
     font-size: var(--font-size-sm);
-    color: var(--color-text-tertiary);
+    color: var(--text-secondary);
 }
 
 .detailsCard {

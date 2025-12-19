@@ -196,11 +196,13 @@
 
     /* Text Colors */
     --text-primary: var(--color-gray-900);
-    --text-secondary: var(--color-gray-600);
-    --text-tertiary: var(--color-gray-500);
+    --text-secondary: var(--color-gray-700);
+    --text-tertiary: var(--color-gray-600);
+    --text-muted: var(--color-gray-500);
     --text-inverse: var(--color-white);
     --text-link: var(--color-primary-600);
     --text-link-hover: var(--color-primary-700);
+    --text-placeholder: var(--color-gray-500);
 
     /* Background Colors */
     --bg-primary: var(--color-white);
@@ -239,14 +241,16 @@
     --input-border: var(--border-primary);
     --input-border-focus: var(--color-primary-500);
     --input-text: var(--text-primary);
-    --input-placeholder: var(--text-tertiary);
+    --input-placeholder: var(--text-placeholder);
 }
 
 /* ========== DARK MODE (Future) ========== */
 [data-theme="dark"] {
-    --text-primary: var(--color-gray-100);
-    --text-secondary: var(--color-gray-400);
-    --text-tertiary: var(--color-gray-500);
+    --text-primary: var(--color-gray-50);
+    --text-secondary: var(--color-gray-300);
+    --text-tertiary: var(--color-gray-400);
+    --text-muted: var(--color-gray-500);
+    --text-placeholder: var(--color-gray-500);
 
     --bg-primary: var(--color-gray-900);
     --bg-secondary: var(--color-gray-800);
