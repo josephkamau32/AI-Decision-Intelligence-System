@@ -4,10 +4,18 @@ from pydantic import BaseModel
 import pandas as pd
 import logging
 
-from ..ml.automl import AutoML
-from ..ml.inference import ModelInference
-from ..ml.explainability import ModelExplainer
-from ..services.model_service import model_service
+# Make ML imports optional to allow auth to work without ML dependencies
+try:
+    from ..ml.automl import AutoML
+    from ..ml.inference import ModelInference
+    from ..ml.explainability import ModelExplainer
+    from ..services.model_service import model_service
+    ML_AVAILABLE = True
+except ImportError as e:
+    ML_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning(f"ML modules not available: {e}. ML endpoints will not function.")
+    model_service = None
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +67,12 @@ async def train_model(request: TrainModelRequest, background_tasks: BackgroundTa
     
     This endpoint starts a background training task
     """
+    if not ML_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="ML features are currently unavailable. Please check server configuration."
+        )
+    
     try:
         logger.info(f"Received training request for dataset {request.dataset_id}")
         

@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "Decisera API"
-    debug_mode: bool = False
+    debug_mode: bool = True  # Enable for local development
     version: str = "1.0.0"
     api_v1_prefix: str = "/api/v1"
 
