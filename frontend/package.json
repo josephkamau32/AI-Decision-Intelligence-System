@@ -1,7 +1,7 @@
 {
-  "name": "frontend",
+  "name": "decisera-frontend",
   "version": "1.0.0",
-  "description": "Frontend for AI Decision Intelligence System",
+  "description": "Frontend for Decisera - AI Decision Intelligence Platform",
   "main": "index.tsx",
   "scripts": {
     "start": "react-scripts start",

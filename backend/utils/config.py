@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # Application
-    app_name: str = "AI Decision Intelligence System API"
+    app_name: str = "Decisera API"
     debug_mode: bool = False
     version: str = "1.0.0"
     api_v1_prefix: str = "/api/v1"
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # MLflow
     mlflow_tracking_uri: str = "file:./mlops/experiments"
-    mlflow_experiment_name: str = "AI Decision Intelligence"
+    mlflow_experiment_name: str = "Decisera"
 
     # OpenAI
     openai_api_key: str = ""

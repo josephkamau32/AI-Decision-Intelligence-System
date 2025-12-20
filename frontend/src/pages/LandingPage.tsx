@@ -12,7 +12,7 @@ const LandingPage: React.FC = () => {
                         <svg viewBox="0 0 24 24" fill="currentColor" className={styles.logoIcon}>
                             <path d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <span className={styles.logoText}>AI Decision Intelligence</span>
+                        <span className={styles.logoText}>Decisera</span>
                     </div>
                     <nav className={styles.nav}>
                         <Link to="/login" className={styles.navLink}>Sign In</Link>
@@ -283,7 +283,7 @@ const LandingPage: React.FC = () => {
                             <svg viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            <span>AI Decision Intelligence</span>
+                            <span>Decisera</span>
                         </div>
                         <p className={styles.footerText}>
                             Transform data into decisions with enterprise-grade AI
@@ -295,7 +295,7 @@ const LandingPage: React.FC = () => {
                     </div>
                 </div>
                 <div className={styles.footerBottom}>
-                    <p>© 2025 AI Decision Intelligence. All rights reserved.</p>
+                    <p>© 2025 Decisera. All rights reserved.</p>
                 </div>
             </footer>
         </div>

@@ -1,4 +1,4 @@
-# 🚀 AI Decision Intelligence Platform
+# 🚀 Decisera - AI Decision Intelligence Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -9,7 +9,7 @@
 
 An enterprise-grade, production-ready analytics platform that automates machine learning workflows, provides natural language insights through AI copilot, and delivers explainable predictions with zero code required.
 
-![AI Decision Intelligence Platform](https://img.shields.io/badge/Status-Production%20Ready-success)
+![Decisera](https://img.shields.io/badge/Status-Production%20Ready-success)
 
 ---
 

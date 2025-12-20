@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.version,
-    description="High-performance API for AI Decision Intelligence System with MLOps capabilities",
+    description="High-performance API for Decisera - AI Decision Intelligence Platform with MLOps capabilities",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan

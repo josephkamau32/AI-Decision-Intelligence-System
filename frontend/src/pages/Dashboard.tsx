@@ -77,7 +77,7 @@ const Dashboard: React.FC = () => {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Dashboard</h1>
-          <p className={styles.subtitle}>Welcome to AI Decision Intelligence System</p>
+          <p className={styles.subtitle}>Welcome to Decisera</p>
         </div>
       </div>
 

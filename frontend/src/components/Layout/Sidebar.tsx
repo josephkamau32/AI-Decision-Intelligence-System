@@ -101,7 +101,7 @@ const Sidebar: React.FC = () => {
                             <path d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                     </div>
-                    {!collapsed && <span className={styles.logoText}>AI Decision</span>}
+                    {!collapsed && <span className={styles.logoText}>Decisera</span>}
                 </div>
                 <button
                     className={styles.collapseButton}
