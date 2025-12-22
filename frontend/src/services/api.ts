@@ -6,9 +6,9 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const api: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout: 30000,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    // Don't set default Content-Type - let axios determine it based on request data
+    // For JSON: axios auto-sets 'application/json'
+    // For FormData: axios auto-sets 'multipart/form-data' with boundary
 });
 
 // Request interceptor
