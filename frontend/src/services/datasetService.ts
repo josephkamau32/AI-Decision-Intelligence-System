@@ -6,11 +6,8 @@ export const uploadDataset = async (file: File): Promise<void> => {
   formData.append('name', file.name);
   formData.append('description', '');
 
-  await api.post(`/api/v1/datasets/upload`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Don't manually set Content-Type - let axios set it with the correct boundary
+  await api.post(`/api/v1/datasets/upload`, formData);
 };
 
 export const getDatasets = async (): Promise<any[]> => {
