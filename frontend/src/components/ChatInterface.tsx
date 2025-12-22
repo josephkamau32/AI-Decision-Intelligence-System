@@ -9,6 +9,8 @@ interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  confidence?: number;  // AI response confidence (0-1)
+  metadata?: Record<string, any>;  // Additional metadata
 }
 
 const ChatInterface: React.FC = () => {
@@ -46,7 +48,9 @@ const ChatInterface: React.FC = () => {
         id: `bot-${Date.now()}`,
         text: response.answer,
         sender: 'bot',
-        timestamp: new Date()
+        timestamp: new Date(),
+        confidence: response.confidence,
+        metadata: response.metadata
       };
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
@@ -72,6 +76,20 @@ const ChatInterface: React.FC = () => {
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getConfidenceLevel = (confidence?: number): 'high' | 'medium' | 'low' | null => {
+    if (!confidence) return null;
+    if (confidence >= 0.8) return 'high';
+    if (confidence >= 0.5) return 'medium';
+    return 'low';
+  };
+
+  const getConfidenceLabel = (confidence?: number): string | null => {
+    if (!confidence) return null;
+    const level = getConfidenceLevel(confidence);
+    const percentage = Math.round(confidence * 100);
+    return `${percentage}% confidence (${level})`;
   };
 
   return (
@@ -103,7 +121,18 @@ const ChatInterface: React.FC = () => {
               </div>
               <div className={styles.messageBody}>
                 <p className={styles.messageText}>{msg.text}</p>
-                <span className={styles.messageTime}>{formatTime(msg.timestamp)}</span>
+                <div className={styles.messageFooter}>
+                  <span className={styles.messageTime}>{formatTime(msg.timestamp)}</span>
+                  {msg.sender === 'bot' && msg.confidence !== undefined && (
+                    <span
+                      className={`${styles.confidenceBadge} ${styles[`confidence${getConfidenceLevel(msg.confidence)?.charAt(0).toUpperCase()}${getConfidenceLevel(msg.confidence)?.slice(1)}`]}`}
+                      aria-label={getConfidenceLabel(msg.confidence) || undefined}
+                      title={getConfidenceLabel(msg.confidence) || undefined}
+                    >
+                      {Math.round(msg.confidence * 100)}%
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -140,14 +169,20 @@ const ChatInterface: React.FC = () => {
           className={styles.input}
           rows={1}
           disabled={loading}
+          aria-label="Ask AI Copilot a question"
+          aria-describedby="copilot-help-text"
         />
+        <span id="copilot-help-text" className={styles.srOnly}>
+          Type your question and press Enter or click Send to ask AI Copilot
+        </span>
         <Button
           onClick={handleSend}
           disabled={!input.trim() || loading}
           loading={loading}
           variant="primary"
+          aria-label="Send message to AI Copilot"
         >
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
           </svg>
         </Button>

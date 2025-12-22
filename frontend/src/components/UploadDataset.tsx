@@ -93,6 +93,15 @@ const UploadDataset: React.FC = () => {
         onDragOver={handleDrag}
         onDrop={handleDrop}
         onClick={handleButtonClick}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload dataset - click to browse or drag and drop files"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleButtonClick();
+          }
+        }}
       >
         <input
           ref={fileInputRef}
@@ -100,6 +109,8 @@ const UploadDataset: React.FC = () => {
           accept=".csv,.xlsx,.json"
           onChange={handleFileChange}
           className={styles.fileInput}
+          aria-label="Select dataset file to upload"
+          id="dataset-file-input"
         />
 
         <div className={styles.dropzoneContent}>
