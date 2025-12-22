@@ -25,5 +25,6 @@ export const uploadDataset = async (file: File): Promise<void> => {
 
 export const getDatasets = async (): Promise<any[]> => {
   const response = await api.get(`/api/v1/datasets/`);
-  return response.data.datasets || [];
+  // Backend returns PaginatedResponse with 'data' field
+  return response.data.data || [];
 };

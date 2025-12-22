@@ -18,7 +18,7 @@ from .datasets import router as datasets_router
 # Temporarily disabled ML-dependent imports
 # from .models import router as models_router
 # from .visualizations import router as visualizations_router
-# from .copilot import router as copilot_router
+from .copilot import router as copilot_router
 from .users import router as users_router
 from ..utils.config import settings
 from ..monitoring.prometheus_metrics import setup_prometheus_metrics
@@ -184,11 +184,11 @@ app.include_router(
 # )
 
 
-# app.include_router(
-#     copilot_router,
-#     prefix=f"{settings.api_v1_prefix}/copilot",
-#     tags=["copilot"]
-# )
+app.include_router(
+    copilot_router,
+    prefix=f"{settings.api_v1_prefix}/copilot",
+    tags=["copilot"]
+)
 
 app.include_router(
     users_router,

@@ -1,50 +1,68 @@
-from langchain.agents import initialize_agent, AgentType
-from langchain.chat_models import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
-from .tools import tools
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
 from ..utils.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AICopilotAgent:
     def __init__(self):
-        self.llm = ChatOpenAI(
-            temperature=0,
-            model="gpt-3.5-turbo",
-            openai_api_key=settings.openai_api_key
-        )
-        self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-        self.agent = initialize_agent(
-            tools=tools,
-            llm=self.llm,
-            agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-            memory=self.memory,
-            verbose=True
-        )
+        """Initialize the AI Copilot with ChatOpenAI."""
+        try:
+            self.llm = ChatOpenAI(
+                temperature=0.7,
+                model="gpt-3.5-turbo",
+                openai_api_key=settings.openai_api_key or "dummy-key"  # Prevent initialization error
+            )
+            logger.info("AI Copilot initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize copilot: {e}")
+            self.llm = None
 
     def query(self, user_input: str) -> str:
-        """Process user query and return response."""
+        """
+        Process user query and return response.
+        
+        Args:
+            user_input: The user's question
+            
+        Returns:
+            AI-generated response string
+        """
         try:
-            response = self.agent.run(user_input)
-            return response
+            if not self.llm:
+                return "AI Copilot is not properly initialized. Please check the configuration."
+            
+            if not settings.openai_api_key:
+                return "AI Copilot requires an OpenAI API key to be configured. Please set OPENAI_API_KEY in your environment."
+            
+            # Create messages for the chat
+            messages = [
+                SystemMessage(content="You are a helpful AI assistant for a data analytics platform. You help users understand their datasets, models, and analytics results. Provide clear, concise, and accurate responses."),
+                HumanMessage(content=user_input)
+            ]
+            
+            # Get response from OpenAI
+            response = self.llm.invoke(messages)
+            return response.content
+            
         except Exception as e:
-            return f"Error processing query: {str(e)}"
+            logger.error(f"Error processing query: {e}")
+            error_msg = str(e).lower()
+            
+            if "api_key" in error_msg or "authentication" in error_msg:
+                return "There was an authentication issue with the AI service. Please verify your OpenAI API key is valid."
+            elif "rate" in error_msg or "quota" in error_msg:
+                return "The AI service rate limit was exceeded. Please try again in a moment."
+            elif "timeout" in error_msg:
+                return "The request timed out. Please try again with a simpler question."
+            else:
+                return f"I encountered an error processing your question: {str(e)}"
 
-    def grounded_response(self, response: str, query: str) -> str:
-        """Ensure response is grounded in available data."""
-        from .rag import rag_system
-        context = rag_system.get_context(query)
-        # Check if key elements in response are present in context
-        response_lower = response.lower()
-        context_lower = context.lower()
-        grounded = True
-        # Simple heuristic: check for numbers or specific terms
-        import re
-        numbers = re.findall(r'\d+\.?\d*', response)
-        for num in numbers:
-            if num not in context:
-                grounded = False
-                break
-        if not grounded:
-            response += "\n\nNote: This response may contain information not fully grounded in available data. Please verify."
-        return response
-
-copilot_agent = AICopilotAgent()
+# Create singleton instance
+try:
+    copilot_agent = AICopilotAgent()
+    logger.info("Copilot agent singleton created")
+except Exception as e:
+    logger.error(f"Failed to create copilot agent: {e}")
+    copilot_agent = None
