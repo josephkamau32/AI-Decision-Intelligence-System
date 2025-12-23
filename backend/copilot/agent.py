@@ -8,22 +8,25 @@ logger = logging.getLogger(__name__)
 class AICopilotAgent:
     def __init__(self):
         """Initialize the AI Copilot with Google Gemini."""
+        self.model = None
+        
         try:
             # Check if API key is available
             if not settings.google_api_key:
-                logger.warning("Google API key is not set")
-                self.model = None
+                logger.warning("Google API key is not set in environment")
                 return
             
             # Configure Google Generative AI
             genai.configure(api_key=settings.google_api_key)
             
-            # Create the model
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            # Create the model - try gemini-pro which is more widely available
+            # Don't test it during init - just create it
+            self.model = genai.GenerativeModel('gemini-pro')
             
-            logger.info("✓ AI Copilot initialized successfully with Google Gemini")
+            logger.info("✓ AI Copilot model created (will be tested on first use)")
+            
         except Exception as e:
-            logger.error(f"Failed to initialize copilot: {e}")
+            logger.error(f"Failed to create copilot model: {type(e).__name__}: {e}")
             self.model = None
 
     def query(self, user_input: str) -> str:
@@ -37,10 +40,15 @@ class AICopilotAgent:
             AI-generated response string
         """
         try:
-            if not self.model:
-                if not settings.google_api_key:
-                    return "AI Copilot requires a Google API key to be configured. Please set GOOGLE_API_KEY in your environment."
-                return "AI Copilot is not properly initialized. Please check the configuration."
+            # Check if API key is available
+            if not settings.google_api_key:
+                return "AI Copilot requires a Google API key to be configured. Please set GOOGLE_API_KEY in your environment."
+            
+            # Reconfigure API on each request to avoid caching issues
+            genai.configure(api_key=settings.google_api_key)
+            
+            # Create model fresh each time
+            model = genai.GenerativeModel('gemini-pro')
             
             # Create system context + user question
             prompt = f"""You are a helpful AI assistant for a data analytics platform called Decisera. 
@@ -50,7 +58,7 @@ Provide clear, concise, and accurate responses.
 User question: {user_input}"""
             
             # Get response from Gemini
-            response = self.model.generate_content(prompt)
+            response = model.generate_content(prompt)
             return response.text
             
         except Exception as e:
@@ -61,7 +69,17 @@ User question: {user_input}"""
             error_type = type(e).__name__
             
             # Check for specific Google API errors
-            if "resourceexhausted" in error_type.lower():
+            if "notfound" in error_type.lower():
+                logger.error("Gemini API model not found - API may not be enabled")
+                return """The Gemini API is not enabled or accessible. Please:
+
+1. Go to https://makersuite.google.com/app/apikey
+2. Ensure you have a valid API key
+3. Or visit https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
+4. Click "Enable" to activate the Generative Language API
+
+Your current API key may not have the Gemini API enabled."""
+            elif "resourceexhausted" in error_type.lower():
                 logger.warning("Google API quota exceeded")
                 return "The AI service quota has been exceeded. Please try again later or check your API quota at https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"
             elif "api_key" in error_msg or "authentication" in error_msg or "api key" in error_msg or "unauthenticated" in error_type.lower():
