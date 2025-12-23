@@ -95,6 +95,21 @@ const Login: React.FC = () => {
                         </p>
                     </div>
 
+                    {/* Demo Credentials Banner */}
+                    <div className={styles.demoCredentials}>
+                        <div className={styles.demoIcon}>
+                            <svg fill="none" viewBox="0 0 24 24" stroke="current Color" width="20" height="20">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div className={styles.demoContent}>
+                            <div className={styles.demoTitle}>Demo Account Available</div>
+                            <div className={styles.demoDetails}>
+                                <strong>Username:</strong> demo &nbsp;|&nbsp; <strong>Password:</strong> ***
+                            </div>
+                        </div>
+                    </div>
+
                     <form onSubmit={handleSubmit} className={styles.form}>
                         {error && (
                             <div className={styles.error}>
