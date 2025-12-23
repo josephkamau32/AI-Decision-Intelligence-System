@@ -54,19 +54,28 @@ User question: {user_input}"""
             return response.text
             
         except Exception as e:
-            logger.error(f"Error processing query: {e}")
-            error_msg = str(e).lower()
+            # Log the full error for debugging
+            logger.error(f"Copilot error: {type(e).__name__}: {str(e)}")
             
-            if "api_key" in error_msg or "authentication" in error_msg or "api key" in error_msg:
+            error_msg = str(e).lower()
+            error_type = type(e).__name__
+            
+            # Check for specific Google API errors
+            if "resourceexhausted" in error_type.lower():
+                logger.warning("Google API quota exceeded")
+                return "The AI service quota has been exceeded. Please try again later or check your API quota at https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"
+            elif "api_key" in error_msg or "authentication" in error_msg or "api key" in error_msg or "unauthenticated" in error_type.lower():
                 return "There was an authentication issue with the AI service. Please verify your Google API key is valid."
-            elif "rate" in error_msg or "quota" in error_msg:
-                return "The AI service rate limit was exceeded. Please try again in a moment."
+            elif "permissiondenied" in error_type.lower() or "permission" in error_msg:
+                return "Permission denied. Please check that your API key has access to the Gemini API."
             elif "timeout" in error_msg:
                 return "The request timed out. Please try again with a simpler question."
             elif "safety" in error_msg or "blocked" in error_msg:
-                return "I cannot provide a response to that question. Please try rephrasing your question."
+                return "I cannot provide a response to that question due to content safety policies. Please try rephrasing your question."
             else:
-                return f"I encountered an error processing your question. Please try again or contact support."
+                # Return a generic error with the actual error type for debugging
+                logger.error(f"Unhandled error type: {error_type}")
+                return f"I encountered an error: {error_type}. Please try again or contact support if this persists."
 
 
 # Lazy singleton initialization - ensures settings are loaded first
