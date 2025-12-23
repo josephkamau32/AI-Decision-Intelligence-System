@@ -1,4 +1,4 @@
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from ..utils.config import settings
 import logging
@@ -7,14 +7,15 @@ logger = logging.getLogger(__name__)
 
 class AICopilotAgent:
     def __init__(self):
-        """Initialize the AI Copilot with ChatOpenAI."""
+        """Initialize the AI Copilot with Google Gemini."""
         try:
-            self.llm = ChatOpenAI(
+            # Use Google Gemini instead of OpenAI
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash",
                 temperature=0.7,
-                model="gpt-3.5-turbo",
-                openai_api_key=settings.openai_api_key or "dummy-key"  # Prevent initialization error
+                google_api_key=settings.google_api_key or "dummy-key"  # Prevent initialization error
             )
-            logger.info("AI Copilot initialized successfully")
+            logger.info("AI Copilot initialized successfully with Google Gemini")
         except Exception as e:
             logger.error(f"Failed to initialize copilot: {e}")
             self.llm = None
@@ -33,8 +34,8 @@ class AICopilotAgent:
             if not self.llm:
                 return "AI Copilot is not properly initialized. Please check the configuration."
             
-            if not settings.openai_api_key:
-                return "AI Copilot requires an OpenAI API key to be configured. Please set OPENAI_API_KEY in your environment."
+            if not settings.google_api_key:
+                return "AI Copilot requires a Google API key to be configured. Please set GOOGLE_API_KEY in your environment."
             
             # Create messages for the chat
             messages = [
@@ -51,7 +52,7 @@ class AICopilotAgent:
             error_msg = str(e).lower()
             
             if "api_key" in error_msg or "authentication" in error_msg:
-                return "There was an authentication issue with the AI service. Please verify your OpenAI API key is valid."
+                return "There was an authentication issue with the AI service. Please verify your Google API key is valid."
             elif "rate" in error_msg or "quota" in error_msg:
                 return "The AI service rate limit was exceeded. Please try again in a moment."
             elif "timeout" in error_msg:

@@ -30,6 +30,9 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: str = ""
+    
+    # Google Gemini
+    google_api_key: str = ""
 
     # Celery and Redis
     redis_url: str = "redis://localhost:6379/0"

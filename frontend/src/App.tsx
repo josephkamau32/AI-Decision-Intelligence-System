@@ -48,47 +48,36 @@ function App() {
                   <Route path="/register" element={<Register />} />
 
                   {/* Protected routes - Dashboard */}
+                  {/* TEMP: Authentication disabled for direct access */}
                   <Route path="/dashboard" element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <Dashboard />
-                      </Layout>
-                    </ProtectedRoute>
+                    <Layout>
+                      <Dashboard />
+                    </Layout>
                   } />
                   <Route path="/dataset-overview" element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <DatasetOverview />
-                      </Layout>
-                    </ProtectedRoute>
+                    <Layout>
+                      <DatasetOverview />
+                    </Layout>
                   } />
                   <Route path="/model-performance" element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <ModelPerformance />
-                      </Layout>
-                    </ProtectedRoute>
+                    <Layout>
+                      <ModelPerformance />
+                    </Layout>
                   } />
                   <Route path="/feature-importance" element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <FeatureImportance />
-                      </Layout>
-                    </ProtectedRoute>
+                    <Layout>
+                      <FeatureImportance />
+                    </Layout>
                   } />
                   <Route path="/visual-insights" element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <VisualInsights />
-                      </Layout>
-                    </ProtectedRoute>
+                    <Layout>
+                      <VisualInsights />
+                    </Layout>
                   } />
                   <Route path="/copilot" element={
-                    <ProtectedRoute>
-                      <Layout>
-                        <CopilotChat />
-                      </Layout>
-                    </ProtectedRoute>
+                    <Layout>
+                      <CopilotChat />
+                    </Layout>
                   } />
                 </Routes>
               </Suspense>

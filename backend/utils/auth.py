@@ -18,9 +18,12 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # HTTP Bearer token scheme
 security = HTTPBearer()
 
-# In-memory user store (replace with database in production)
-users_db: Dict[str, Dict[str, Any]] = {}
-api_keys_db: Dict[str, Dict[str, Any]] = {}
+# Persistent storage (uses JSON files instead of in-memory dictionaries)
+from .storage import users_storage, api_keys_storage
+
+# For backward compatibility, create dictionary-like references
+users_db = users_storage
+api_keys_db = api_keys_storage
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -283,8 +286,26 @@ def register_user(username: str, email: str, password: str, role: str = "user") 
         Created user data (without password)
         
     Raises:
-        HTTPException: If username or email already exists
+        HTTPException: If username or email already exists or validation fails
     """
+    # Validate password strength
+    from .validators import validate_password_strength, validate_email
+    
+    password_validation = validate_password_strength(password)
+    if not password_validation.valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Password validation failed: {'; '.join(password_validation.errors)}"
+        )
+    
+    # Validate email format
+    email_validation = validate_email(email)
+    if not email_validation.valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Email validation failed: {'; '.join(email_validation.errors)}"
+        )
+    
     # Check if username exists
     for user_id, user in users_db.items():
         if user["username"] == username:
@@ -311,10 +332,15 @@ def register_user(username: str, email: str, password: str, role: str = "user") 
         "is_active": True,
         "is_verified": False,
         "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "updated_at": datetime.utcnow(),
+        "failed_login_attempts": 0,
+        "last_login": None
     }
     
     users_db[user_id] = user
+    
+    # Log security event
+    logger.info(f"New user registered: {username} (ID: {user_id})")
     
     # Return user without password
     return {k: v for k, v in user.items() if k != "hashed_password"}
@@ -333,20 +359,43 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
     """
     # Find user
     user = None
-    for user_id, u in users_db.items():
+    user_id = None
+    for uid, u in users_db.items():
         if u["username"] == username:
             user = u
+            user_id = uid
             break
     
     if not user:
+        logger.warning(f"Authentication failed: User not found - {username}")
         return None
+    
+    # Check if account is locked due to failed attempts
+    if user.get("failed_login_attempts", 0) >= 5:
+        logger.warning(f"Authentication blocked: Too many failed attempts - {username}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Account temporarily locked due to too many failed login attempts. Please try again later."
+        )
     
     # Verify password
     if not verify_password(password, user["hashed_password"]):
+        # Increment failed attempts
+        user["failed_login_attempts"] = user.get("failed_login_attempts", 0) + 1
+        users_db[user_id] = user
+        logger.warning(f"Authentication failed: Incorrect password - {username} (attempts: {user['failed_login_attempts']})")
         return None
     
     # Check if active
     if not user.get("is_active", True):
+        logger.warning(f"Authentication failed: Inactive account - {username}")
         return None
+    
+    # Reset failed attempts on successful login
+    user["failed_login_attempts"] = 0
+    user["last_login"] = datetime.utcnow()
+    users_db[user_id] = user
+    
+    logger.info(f"Authentication successful: {username}")
     
     return user

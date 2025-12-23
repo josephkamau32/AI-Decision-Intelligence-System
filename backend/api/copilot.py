@@ -36,11 +36,11 @@ async def ask_copilot(query: CopilotQuery):
                 detail="Question cannot be empty"
             )
         
-        # Check if OpenAI API key is configured
-        if not settings.openai_api_key:
-            logger.warning("OpenAI API key not configured, returning fallback response")
+        # Check if Google API key is configured
+        if not settings.google_api_key:
+            logger.warning("Google API key not configured, returning fallback response")
             return CopilotResponse(
-                answer="AI Copilot is not fully configured. Please set the OPENAI_API_KEY environment variable to enable LLM-powered responses.",
+                answer="AI Copilot is not fully configured. Please set the GOOGLE_API_KEY environment variable to enable LLM-powered responses.",
                 sources=["System Configuration"],
                 confidence=0.0,
                 metadata={"error": "missing_api_key"}

@@ -15,13 +15,29 @@ import time
 
 from .health import router as health_router
 from .datasets import router as datasets_router
-# Temporarily disabled ML-dependent imports
-# from .models import router as models_router
-# from .visualizations import router as visualizations_router
+# ML-dependent imports with optional loading
+try:
+    from .models import router as models_router
+    from .visualizations import router as visualizations_router
+    ML_AVAILABLE = True
+    logger.info("ML modules loaded successfully")
+except ImportError as e:
+    logger.warning(f"ML modules not available: {e}. ML endpoints will be disabled.")
+    models_router = None
+    visualizations_router = None
+    ML_AVAILABLE = False
+
 from .copilot import router as copilot_router
 from .users import router as users_router
+from .insights import router as insights_router
 from ..utils.config import settings
 from ..monitoring.prometheus_metrics import setup_prometheus_metrics
+from ..utils.error_handlers import (
+    DeciseraException,
+    handle_decisera_exception,
+    handle_http_exception,
+    handle_generic_exception
+)
 
 # Configure logging
 logging.basicConfig(
@@ -40,6 +56,33 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.app_name}")
     logger.info(f"Debug mode: {settings.debug_mode}")
     logger.info(f"API version: {settings.version}")
+    
+    # Run production validation checks
+    try:
+        from ..utils.production_checks import run_startup_validation
+        is_valid, validator = run_startup_validation()
+        if not is_valid:
+            logger.warning("Production validation found issues. Please check the logs.")
+        else:
+            logger.info("✓ Production validation passed")
+    except Exception as e:
+        logger.warning(f"Could not run production validation: {e}")
+    
+    # Create default demo user if no users exist
+    try:
+        from ..utils.auth import users_db, register_user
+        if len(list(users_db.keys())) == 0:
+            logger.info("Creating default demo user...")
+            # Note: This will fail validation due to weak password, using a stronger one
+            register_user(
+                username="demo",
+                email="demo@decisera.com",
+                password="Demo@123456",  # Meets password requirements
+                role="admin"
+            )
+            logger.info("✓ Default user created: demo/Demo@123456")
+    except Exception as e:
+        logger.warning(f"Could not create default user: {e}")
     
     yield
     
@@ -105,37 +148,10 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Custom Exception Handlers
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    logger.error(f"HTTP error {exc.status_code}: {exc.detail}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": {
-                "code": exc.status_code,
-                "message": exc.detail,
-                "path": str(request.url.path)
-            }
-        }
-    )
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    
-    # Don't leak error details in production
-    error_message = str(exc) if settings.debug_mode else "Internal server error"
-    
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": {
-                "code": 500,
-                "message": error_message,
-                "path": str(request.url.path)
-            }
-        }
-    )
+# Register custom error handlers
+app.add_exception_handler(DeciseraException, handle_decisera_exception)
+app.add_exception_handler(HTTPException, handle_http_exception)
+app.add_exception_handler(Exception, handle_generic_exception)
 
 # Root endpoint with API information
 @app.get("/")
@@ -170,18 +186,26 @@ app.include_router(
 )
 
 
-# Temporarily disabled ML-dependent routers until dependencies are fixed
-# app.include_router(
-#     models_router,
-#     prefix=f"{settings.api_v1_prefix}/models",
-#     tags=["models"]
-# )
+# Conditionally include ML-dependent routers
+if ML_AVAILABLE and models_router:
+    app.include_router(
+        models_router,
+        prefix=f"{settings.api_v1_prefix}/models",
+        tags=["models"]
+    )
+    logger.info("✓ Models router enabled")
+else:
+    logger.info("Models router disabled (ML dependencies not available)")
 
-# app.include_router(
-#     visualizations_router,
-#     prefix=f"{settings.api_v1_prefix}/visualizations",
-#     tags=["visualizations"]
-# )
+if ML_AVAILABLE and visualizations_router:
+    app.include_router(
+        visualizations_router,
+        prefix=f"{settings.api_v1_prefix}/visualizations",
+        tags=["visualizations"]
+    )
+    logger.info("✓ Visualizations router enabled")
+else:
+    logger.info("Visualizations router disabled (ML dependencies not available)")
 
 
 app.include_router(
@@ -193,6 +217,12 @@ app.include_router(
 app.include_router(
     users_router,
     tags=["authentication"]
+)
+
+app.include_router(
+    insights_router,
+    prefix=f"{settings.api_v1_prefix}/insights",
+    tags=["insights"]
 )
 
 # Setup Prometheus metrics

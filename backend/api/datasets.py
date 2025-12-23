@@ -101,19 +101,46 @@ async def get_dataset(dataset_id: str):
     """Get details of a specific dataset."""
     logger.info(f"Getting dataset: {dataset_id}")
     
-    # TODO: Implement actual dataset retrieval
-    return {
-        "id": dataset_id,
-        "name": "Sample Dataset",
-        "description": "A sample dataset",
-        "rows": 1000,
-        "columns": 50
-    }
+    try:
+        dataset = dataset_service.get_dataset(dataset_id)
+        if not dataset:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dataset not found: {dataset_id}"
+            )
+        
+        logger.info(f"Retrieved dataset: {dataset_id}")
+        return dataset.dict()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to retrieve dataset {dataset_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve dataset: {str(e)}"
+        )
 
 @router.delete("/{dataset_id}")
 async def delete_dataset(dataset_id: str):
     """Delete a dataset."""
     logger.info(f"Deleting dataset: {dataset_id}")
     
-    # TODO: Implement actual dataset deletion
-    return {"message": f"Dataset {dataset_id} deleted successfully"}
+    try:
+        success = dataset_service.delete_dataset(dataset_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Dataset not found: {dataset_id}"
+            )
+        
+        logger.info(f"Dataset deleted successfully: {dataset_id}")
+        return {"message": f"Dataset {dataset_id} deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete dataset {dataset_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete dataset: {str(e)}"
+        )
