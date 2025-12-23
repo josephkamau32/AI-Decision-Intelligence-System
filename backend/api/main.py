@@ -15,6 +15,15 @@ import time
 
 from .health import router as health_router
 from .datasets import router as datasets_router
+
+# Configure logging early
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # ML-dependent imports with optional loading
 try:
     from .models import router as models_router
@@ -39,12 +48,7 @@ from ..utils.error_handlers import (
     handle_generic_exception
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)

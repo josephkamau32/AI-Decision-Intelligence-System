@@ -4,7 +4,7 @@
   "description": "Frontend for Decisera - AI Decision Intelligence Platform",
   "main": "index.tsx",
   "scripts": {
-    "start": "react-scripts start",
+    "start": "set PORT=3000&& set BROWSER=none&& react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
