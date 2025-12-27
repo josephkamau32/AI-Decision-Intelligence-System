@@ -11,6 +11,14 @@ An enterprise-grade, production-ready analytics platform that automates machine 
 
 ![Decisera](https://img.shields.io/badge/Status-Production%20Ready-success)
 
+## 🌐 Live Demo
+
+**🚀 [Try Decisera Now](https://decisera.vercel.app/)** - Experience the platform in action!
+
+> **Demo Credentials:**
+> - Username: `demo`
+> - Password: `***`
+
 ---
 
 ## ✨ Features
