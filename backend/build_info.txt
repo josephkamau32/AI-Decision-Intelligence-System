@@ -1,0 +1,7 @@
+# Build timestamp: 2025-12-27 14:40 UTC
+# This file forces a fresh build on Render
+
+BUILD_VERSION=1.0.1
+LAST_UPDATED=2025-12-27
+NUMPY_VERSION=1.26.4
+MLFLOW_VERSION=2.16.2
