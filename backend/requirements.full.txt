@@ -1,0 +1,30 @@
+# Python dependencies for backend - Minimal version for Python 3.13 compatibility
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.10.5
+pydantic-settings==2.7.1
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+aiofiles==23.2.1
+
+# Lightweight ML dependencies (Python 3.13 compatible)
+scikit-learn==1.5.2
+numpy<2.0
+joblib==1.4.2
+
+# AI Copilot dependencies
+langchain==0.1.0
+langchain-openai==0.0.2
+openai==1.7.2
+tiktoken==0.5.2
+
+# Performance & Optimization
+httpx==0.26.0
+slowapi==0.1.9
+prometheus-client==0.19.0
+
+# Testing (optional - can be removed for faster builds)
+pytest==7.4.3
+pytest-asyncio==0.23.2

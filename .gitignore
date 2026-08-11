@@ -1,4 +1,4 @@
-# Dependencies
+ # Dependencies
 node_modules/
 
 # Python
@@ -31,6 +31,14 @@ coverage.xml
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Sensitive files
+*.key
+secrets.json
+*.pem
+*.p12
+*.crt
+*.cer
 
 # IDE
 .vscode/

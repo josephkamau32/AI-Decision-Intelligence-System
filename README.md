@@ -15,9 +15,8 @@ An enterprise-grade, production-ready analytics platform that automates machine 
 
 **🚀 [Try Decisera Now](https://decisera.vercel.app/)** - Experience the platform in action!
 
-> **Demo Credentials:**
-> - Username: `demo`
-> - Password: `***`
+> **Demo Access:**
+> Please contact the administrator to provision a secure demo account.
 
 ---
 
