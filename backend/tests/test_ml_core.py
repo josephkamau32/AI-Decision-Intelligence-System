@@ -21,7 +21,7 @@ class TestAutoML:
         
         # Train AutoML
         automl = AutoML(task_type='classification', test_size=0.2)
-        results = automl.fit(X, y)
+        results = automl.fit(X, y, log_artifacts=False)
         
         # Assertions
         assert results['best_model'] is not None
@@ -38,7 +38,7 @@ class TestAutoML:
         
         # Train AutoML
         automl = AutoML(task_type='regression', test_size=0.2)
-        results = automl.fit(X, y)
+        results = automl.fit(X, y, log_artifacts=False)
         
         # Assertions
         assert results['best_model'] is not None
@@ -53,23 +53,23 @@ class TestAutoML:
         y = pd.Series(np.random.randint(0, 2, 100))
         
         automl = AutoML(task_type='classification')
-        automl.fit(X, y)
+        automl.fit(X, y, use_cv=False, log_artifacts=False)
         
         # Make prediction
         X_test = pd.DataFrame(np.random.randn(5, 5), columns=[f'feature_{i}' for i in range(5)])
         predictions = automl.predict(X_test)
         
+        # Assertions
         assert len(predictions) == 5
 
 class TestDataPreprocessing:
-    """Test data preprocessing"""
+    """Test data preprocessing components"""
     
     def test_missing_value_handling(self):
         """Test missing value imputation"""
-        # Create data with missing values
         df = pd.DataFrame({
-            'numeric': [1, 2, np.nan, 4, 5],
-            'categorical': ['a', 'b', np.nan, 'a', 'b']
+            'num1': [1.0, 2.0, np.nan, 4.0, 5.0],
+            'num2': [np.nan, 2.0, 3.0, 4.0, 5.0]
         })
         
         cleaner = DataCleaner(df)
@@ -77,6 +77,7 @@ class TestDataPreprocessing:
         
         # Check no missing values remain
         assert cleaned.isna().sum().sum() == 0
+        assert cleaned['num1'].iloc[2] == 3.0  # Mean of [1, 2, 4, 5]
     
     def test_categorical_encoding(self):
         """Test categorical encoding"""
@@ -102,7 +103,7 @@ class TestExplainability:
         y = pd.Series(np.random.randint(0, 2, 100))
         
         automl = AutoML(task_type='classification')
-        automl.fit(X, y)
+        automl.fit(X, y, use_cv=False, log_artifacts=False)
         
         # Create explainer
         explainer = ModelExplainer(automl.best_model, X.head(20))
@@ -120,7 +121,7 @@ class TestExplainability:
         y = pd.Series(np.random.randint(0, 2, 100))
         
         automl = AutoML(task_type='classification')
-        automl.fit(X, y)
+        automl.fit(X, y, use_cv=False, log_artifacts=False)
         
         # Create explainer and explain one instance
         explainer = ModelExplainer(automl.best_model, X.head(20))

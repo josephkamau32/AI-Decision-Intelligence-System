@@ -27,13 +27,13 @@ class RAGSystem:
 
         df = DataIngestion.load_data(dataset.file_path)
         profiler = DataProfiler(df)
-        profile = profiler.profile()
+        profile = profiler.generate_profile()
 
         # Create documents
         documents = []
 
         # Schema document
-        schema_text = f"Dataset: {dataset.name}\nColumns: {', '.join(profile['columns'])}\nData Types: {profile['data_types']}\nShape: {profile['shape']}"
+        schema_text = f"Dataset: {dataset.name}\nColumns: {', '.join(profile['columns'])}\nData Types: {profile['column_types']}\nShape: {profile['shape']}"
         documents.append(Document(page_content=schema_text, metadata={"type": "schema", "dataset_id": dataset_id}))
 
         # Statistics document

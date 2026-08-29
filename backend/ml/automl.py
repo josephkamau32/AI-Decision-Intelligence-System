@@ -48,14 +48,22 @@ class AutoML:
     
     def detect_task_type(self, X: pd.DataFrame, y: pd.Series) -> str:
         """Automatically detect if task is classification, regression, or time-series"""
+        # Detect date column if present
+        date_col = detect_time_series(X)
+        if date_col is None:
+            for col in X.columns:
+                if pd.api.types.is_datetime64_any_dtype(X[col]) or 'date' in str(col).lower():
+                    date_col = col
+                    break
+        if date_col is not None:
+            self.date_column = date_col
+            
         if self.task_type != 'auto':
             return self.task_type
         
         # Check for time-series data
-        date_col = detect_time_series(X)
-        if date_col is not None:
-            self.date_column = date_col
-            logger.info(f"Auto-detected task type: time_series (date column: {date_col})")
+        if self.date_column is not None:
+            logger.info(f"Auto-detected task type: time_series (date column: {self.date_column})")
             return 'time_series'
         
         # Check if target is numeric with many unique values
@@ -72,8 +80,8 @@ class AutoML:
         """Return dictionary of classification models to train"""
         return {
             'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=1000),
-            'RandomForest': RandomForestClassifier(n_estimators=100, random_state=self.random_state, n_jobs=-1),
-            'XGBoost': XGBClassifier(random_state=self.random_state, n_jobs=-1, use_label_encoder=False, eval_metric='logloss'),
+            'RandomForest': RandomForestClassifier(n_estimators=100, random_state=self.random_state),
+            'XGBoost': XGBClassifier(random_state=self.random_state, use_label_encoder=False, eval_metric='logloss'),
             'GradientBoosting': GradientBoostingClassifier(random_state=self.random_state)
         }
     
@@ -83,22 +91,30 @@ class AutoML:
             'LinearRegression': LinearRegression(),
             'Ridge': Ridge(random_state=self.random_state),
             'Lasso': Lasso(random_state=self.random_state),
-            'RandomForest': RandomForestRegressor(n_estimators=100, random_state=self.random_state, n_jobs=-1),
-            'XGBoost': XGBRegressor(random_state=self.random_state, n_jobs=-1),
+            'RandomForest': RandomForestRegressor(n_estimators=100, random_state=self.random_state),
+            'XGBoost': XGBRegressor(random_state=self.random_state),
             'GradientBoosting': GradientBoostingRegressor(random_state=self.random_state)
         }
     
-    def get_timeseries_models(self) -> Dict[str, Any]:
+    def get_timeseries_models(self, epochs: int = 10) -> Dict[str, Any]:
         """Return dictionary of time-series forecasting models to train"""
-        return {
-            'Prophet': ProphetForecaster(),
-            'LSTM': LSTMForecaster(
+        models = {}
+        try:
+            models['Prophet'] = ProphetForecaster()
+        except Exception as e:
+            logger.warning(f"Prophet unavailable: {e}")
+            
+        try:
+            models['LSTM'] = LSTMForecaster(
                 seq_length=10,
                 hidden_size=64,
-                epochs=50,  # Reduced for faster training
+                epochs=epochs,
                 batch_size=32
             )
-        }
+        except Exception as e:
+            logger.warning(f"LSTM unavailable: {e}")
+            
+        return models
     
     def evaluate_classification(self, y_true, y_pred, y_prob=None) -> Dict[str, float]:
         """Calculate classification metrics"""
@@ -171,7 +187,7 @@ class AutoML:
                     cv = KFold(n_splits=5, shuffle=True, random_state=self.random_state)
                     scoring = 'r2'
                 
-                cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring, n_jobs=-1)
+                cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring)
                 metrics['cv_mean'] = float(cv_scores.mean())
                 metrics['cv_std'] = float(cv_scores.std())
                 logger.info(f"{model_name} CV Score: {metrics['cv_mean']:.4f} (+/- {metrics['cv_std']:.4f})")
@@ -191,7 +207,9 @@ class AutoML:
         X: pd.DataFrame, 
         y: pd.Series,
         dataset_id: str = None,
-        experiment_name: str = "AutoML"
+        experiment_name: str = "AutoML",
+        use_cv: bool = True,
+        log_artifacts: bool = True
     ) -> Dict[str, Any]:
         """
         Train multiple models and select the best one
@@ -201,6 +219,8 @@ class AutoML:
             y: Target variable
             dataset_id: Optional dataset identifier
             experiment_name: MLflow experiment name
+            use_cv: Whether to run 5-fold cross-validation during evaluation (default: True)
+            log_artifacts: Whether to log model artifacts to MLflow (default: True)
             
         Returns:
             Dictionary with best model info and all results
@@ -210,7 +230,7 @@ class AutoML:
         
         # Handle time-series separately
         if self.task_type == 'time_series':
-            return self._fit_timeseries(X, y, dataset_id, experiment_name)
+            return self._fit_timeseries(X, y, dataset_id, experiment_name, log_artifacts=log_artifacts)
         
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
@@ -243,16 +263,22 @@ class AutoML:
             # Train each model
             for model_name, model in models.items():
                 try:
-                    with mlflow.start_run(run_name=model_name, nested=True):
+                    with mlflow.start_run(run_name=model_name, nested=True) as child_run:
                         result = self.train_and_evaluate(
-                            X_train, X_test, y_train, y_test, model_name, model
+                            X_train, X_test, y_train, y_test, model_name, model,
+                            use_cv=use_cv
                         )
+                        result['run_id'] = child_run.info.run_id
                         results[model_name] = result
                         
                         # Log to MLflow
                         mlflow.log_params({f"{model_name}_param": str(model.get_params())})
                         mlflow.log_metrics(result['metrics'])
-                        mlflow.sklearn.log_model(result['model'], model_name)
+                        if log_artifacts:
+                            try:
+                                mlflow.sklearn.log_model(result['model'], model_name)
+                            except Exception as e:
+                                logger.warning(f"Failed to log model artifact for {model_name}: {e}")
                         
                 except Exception as e:
                     logger.error(f"Failed to train {model_name}: {e}")
@@ -263,6 +289,7 @@ class AutoML:
                 self.best_model_name = max(results, key=lambda x: results[x]['primary_score'])
                 self.best_model = results[self.best_model_name]['model']
                 self.best_score = results[self.best_model_name]['primary_score']
+                best_run_id = results[self.best_model_name].get('run_id')
                 
                 logger.info(f"Best model: {self.best_model_name} with score: {self.best_score:.4f}")
                 
@@ -270,9 +297,13 @@ class AutoML:
                 mlflow.log_metric("best_score", self.best_score)
                 mlflow.log_param("best_model", self.best_model_name)
                 
-                # Register best model
-                model_uri = f"runs:/{mlflow.active_run().info.run_id}/{self.best_model_name}"
-                mlflow.register_model(model_uri, f"best_{self.task_type}_model")
+                # Register best model from the child run where the artifact was logged
+                if best_run_id and log_artifacts:
+                    try:
+                        model_uri = f"runs:/{best_run_id}/{self.best_model_name}"
+                        mlflow.register_model(model_uri, f"best_{self.task_type}_model")
+                    except Exception as e:
+                        logger.warning(f"Could not register model in MLflow model registry: {e}")
         
         self.results = results
         self.models = {name: res['model'] for name, res in results.items()}
@@ -321,7 +352,8 @@ class AutoML:
         X: pd.DataFrame,
         y: pd.Series,
         dataset_id: Optional[str] = None,
-        experiment_name: str = "AutoML_TimeSeries"
+        experiment_name: str = "AutoML_TimeSeries",
+        log_artifacts: bool = True
     ) -> Dict[str, Any]:
         """
         Train time-series forecasting models
@@ -331,6 +363,7 @@ class AutoML:
             y: Target variable (time-series values)
             dataset_id: Optional dataset identifier
             experiment_name: MLflow experiment name
+            log_artifacts: Whether to log model artifacts to MLflow (default: True)
             
         Returns:
             Dictionary with best model info and all results
@@ -368,7 +401,7 @@ class AutoML:
             # Train each model
             for model_name, model in models.items():
                 try:
-                    with mlflow.start_run(run_name=model_name, nested=True):
+                    with mlflow.start_run(run_name=model_name, nested=True) as child_run:
                         logger.info(f"Training {model_name}...")
                         
                         # Train model
@@ -391,18 +424,26 @@ class AutoML:
                         results[model_name] = {
                             'model': model,
                             'metrics': metrics,
-                            'primary_score': -metrics['mape']  # Negative MAPE (lower is better, so negate for max)
+                            'primary_score': -metrics['mape'],  # Negative MAPE (lower is better, so negate for max)
+                            'run_id': child_run.info.run_id
                         }
                         
                         # Log to MLflow
                         mlflow.log_metrics(metrics)
                         
                         # Save model
-                        if model_name == 'Prophet':
-                            mlflow.sklearn.log_model(model.model, model_name)
-                        else:
-                            model.save_model(f"{model_name}_model.pt")
-                            mlflow.log_artifact(f"{model_name}_model.pt")
+                        if log_artifacts:
+                            try:
+                                if model_name == 'Prophet':
+                                    mlflow.sklearn.log_model(model.model, model_name)
+                                else:
+                                    import tempfile
+                                    with tempfile.TemporaryDirectory() as tmp_dir:
+                                        tmp_file = os.path.join(tmp_dir, f"{model_name}_model.pt")
+                                        model.save_model(tmp_file)
+                                        mlflow.log_artifact(tmp_file)
+                            except Exception as e:
+                                logger.warning(f"Failed to log time-series artifact for {model_name}: {e}")
                         
                         logger.info(f"{model_name} MAPE: {metrics['mape']:.2f}%, RMSE: {metrics['rmse']:.4f}")
                         
@@ -415,12 +456,20 @@ class AutoML:
                 self.best_model_name = max(results, key=lambda x: results[x]['primary_score'])
                 self.best_model = results[self.best_model_name]['model']
                 self.best_score = results[self.best_model_name]['metrics']['mape']
+                best_run_id = results[self.best_model_name].get('run_id')
                 
                 logger.info(f"Best model: {self.best_model_name} with MAPE: {self.best_score:.2f}%")
                 
                 # Log best model
                 mlflow.log_metric("best_mape", self.best_score)
                 mlflow.log_param("best_model", self.best_model_name)
+                
+                if best_run_id and log_artifacts:
+                    try:
+                        model_uri = f"runs:/{best_run_id}/{self.best_model_name}"
+                        mlflow.register_model(model_uri, f"best_{self.task_type}_model")
+                    except Exception as e:
+                        logger.warning(f"Could not register model in MLflow model registry: {e}")
         
         self.results = results
         self.models = {name: res['model'] for name, res in results.items()}

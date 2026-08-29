@@ -13,8 +13,15 @@ import mlflow.sklearn
 import mlflow.pytorch
 
 # Prophet
-from prophet import Prophet
-from prophet.diagnostics import cross_validation, performance_metrics
+try:
+    from prophet import Prophet
+    from prophet.diagnostics import cross_validation, performance_metrics
+    PROPHET_AVAILABLE = True
+except Exception:
+    Prophet = None
+    cross_validation = None
+    performance_metrics = None
+    PROPHET_AVAILABLE = False
 
 # PyTorch for LSTM
 import torch
@@ -63,15 +70,14 @@ class LSTMModel(nn.Module):
         # x shape: (batch, seq_len, input_size)
         lstm_out, _ = self.lstm(x)
         # Take the last output
-        last_output = lstm_out[:, -1, :]
-        predictions = self.fc(last_output)
-        return predictions
+        out = self.fc(lstm_out[:, -1, :])
+        return out
 
 
 class ProphetForecaster:
     """
-    Prophet-based time-series forecasting model
-    Handles univariate time-series with automatic seasonality detection
+    Facebook Prophet model wrapper for time-series forecasting
+    Handles trend, seasonality, and holiday effects
     """
     
     def __init__(self, 
@@ -90,13 +96,20 @@ class ProphetForecaster:
             weekly_seasonality: Include weekly seasonality
             daily_seasonality: Include daily seasonality
         """
-        self.model = Prophet(
-            seasonality_mode=seasonality_mode,
-            changepoint_prior_scale=changepoint_prior_scale,
-            yearly_seasonality=yearly_seasonality,
-            weekly_seasonality=weekly_seasonality,
-            daily_seasonality=daily_seasonality
-        )
+        if not PROPHET_AVAILABLE or Prophet is None:
+            raise RuntimeError("Prophet is not available or Stan backend is missing")
+            
+        try:
+            self.model = Prophet(
+                seasonality_mode=seasonality_mode,
+                changepoint_prior_scale=changepoint_prior_scale,
+                yearly_seasonality=yearly_seasonality,
+                weekly_seasonality=weekly_seasonality,
+                daily_seasonality=daily_seasonality
+            )
+        except Exception as e:
+            raise RuntimeError(f"Prophet initialization failed: {e}")
+            
         self.is_fitted = False
         self.metrics = {}
         
@@ -119,19 +132,39 @@ class ProphetForecaster:
         self.model.fit(train_data)
         self.is_fitted = True
         
-        # Calculate metrics using cross-validation
-        logger.info("Running cross-validation...")
+        return self
+        
+    def evaluate(self, df: pd.DataFrame, date_col: str, target_col: str,
+                 horizon: str = '30 days', period: str = '15 days') -> Dict[str, float]:
+        """
+        Evaluate Prophet model with cross-validation
+        
+        Args:
+            df: DataFrame with time-series data
+            date_col: Name of date column
+            target_col: Name of target column
+            horizon: Forecast horizon for evaluation
+            period: Period between cutoff dates
+            
+        Returns:
+            Dictionary of performance metrics (MAPE, RMSE, MAE)
+        """
+        if not self.is_fitted:
+            raise ValueError("Model must be fitted before evaluation")
+            
+        # Cross validation
         cv_results = cross_validation(
-            self.model,
-            initial='365 days',
-            period='180 days',
-            horizon='90 days'
+            self.model, 
+            initial=f"{len(df)//2} days",
+            period=period, 
+            horizon=horizon,
+            parallel="processes"
         )
         
         self.metrics = performance_metrics(cv_results)
         logger.info(f"Prophet metrics: {self.metrics[['mape', 'rmse']].mean().to_dict()}")
         
-        return self
+        return self.metrics[['mape', 'rmse', 'mae']].mean().to_dict()
         
     def predict(self, periods: int = 30, freq: str = 'D') -> pd.DataFrame:
         """
@@ -241,12 +274,12 @@ class LSTMForecaster:
         for epoch in range(self.epochs):
             total_loss = 0
             for batch_x, batch_y in dataloader:
-                batch_x = batch_x.unsqueeze(-1).to(self.device)
+                batch_x = batch_x.to(self.device)
                 batch_y = batch_y.to(self.device)
                 
                 # Forward pass
                 outputs = self.model(batch_x)
-                loss = criterion(outputs.squeeze(), batch_y.squeeze())
+                loss = criterion(outputs.squeeze(-1), batch_y.squeeze(-1))
                 
                 # Backward pass
                 optimizer.zero_grad()
@@ -256,7 +289,7 @@ class LSTMForecaster:
                 total_loss += loss.item()
             
             if (epoch + 1) % 10 == 0:
-                avg_loss = total_loss / len(dataloader)
+                avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else 0
                 logger.info(f"Epoch [{epoch+1}/{self.epochs}], Loss: {avg_loss:.4f}")
         
         self.is_fitted = True
@@ -283,7 +316,7 @@ class LSTMForecaster:
         
         # Normalize last sequence
         current_seq = self.scaler.transform(last_sequence.reshape(-1, 1))
-        current_seq = torch.FloatTensor(current_seq).unsqueeze(0).unsqueeze(-1).to(self.device)
+        current_seq = torch.FloatTensor(current_seq).unsqueeze(0).to(self.device)
         
         with torch.no_grad():
             for _ in range(periods):
@@ -292,7 +325,7 @@ class LSTMForecaster:
                 predictions.append(pred.cpu().numpy()[0, 0])
                 
                 # Update sequence for next prediction
-                current_seq = torch.cat([current_seq[:, 1:, :], pred.unsqueeze(1).unsqueeze(-1)], dim=1)
+                current_seq = torch.cat([current_seq[:, 1:, :], pred.unsqueeze(1)], dim=1)
         
         # Denormalize predictions
         predictions = np.array(predictions).reshape(-1, 1)

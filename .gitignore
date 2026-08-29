@@ -59,6 +59,8 @@ mlflow.db
 
 # Artifacts
 models/
+*.pt
+*.joblib
 
 # Local runtime storage (user data, API keys, etc.)
 storage/
