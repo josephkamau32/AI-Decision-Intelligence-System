@@ -14,10 +14,10 @@ class Settings(BaseSettings):
     # Database
     database_url: Optional[str] = None
 
-    # Security
-    secret_key: str = secrets.token_urlsafe(32)
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    # Security & JWT
+    jwt_secret_key: str = secrets.token_urlsafe(32)
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 30
     allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # File upload
@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # Caching
     cache_enabled: bool = True
     cache_ttl: int = 300  # 5 minutes
+
+    # Default Admin User (for development only)
+    allow_default_admin: bool = False  # Gate default admin creation behind explicit flag
 
     # CORS
     cors_credentials: bool = True

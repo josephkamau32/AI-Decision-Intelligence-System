@@ -1,12 +1,12 @@
 """
 Celery tasks for async processing integrated with new AutoML engine
 """
-from celery_app import celery_app
-from ml.automl import AutoML
-from ml.data_preprocessing import DataCleaner, FeatureEngineer
-from ml.explainability import ModelExplainer
-from services.dataset_service import dataset_service
-from services.model_service import model_service
+from .celery_app import celery_app
+from backend.ml.automl import AutoML
+from backend.ml.data_preprocessing import DataCleaner, FeatureEngineer
+from backend.ml.explainability import ModelExplainer
+from .services.dataset_service import dataset_service
+from .services.model_service import model_service
 import pandas as pd
 import numpy as np
 import logging

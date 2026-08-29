@@ -61,7 +61,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=getattr(settings, 'jwt_expiration_minutes', 30))
+        expire = datetime.utcnow() + timedelta(minutes=settings.jwt_expiration_minutes)
     
     to_encode.update({
         "exp": expire,
@@ -69,10 +69,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         "type": "access"
     })
     
-    secret_key = getattr(settings, 'jwt_secret_key', settings.secret_key)
-    algorithm = getattr(settings, 'jwt_algorithm', 'HS256')
-    
-    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=algorithm)
+    encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return encoded_jwt
 
 
@@ -87,10 +84,7 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
         Token payload if valid, None otherwise
     """
     try:
-        secret_key = getattr(settings, 'jwt_secret_key', settings.secret_key)
-        algorithm = getattr(settings, 'jwt_algorithm', 'HS256')
-        
-        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         return payload
     except JWTError:
         return None

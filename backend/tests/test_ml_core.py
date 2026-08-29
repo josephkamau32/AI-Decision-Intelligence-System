@@ -4,10 +4,10 @@ Basic test structure for AutoML and inference
 import pytest
 import pandas as pd
 import numpy as np
-from ml.automl import AutoML
-from ml.inference import ModelInference
-from ml.explainability import ModelExplainer
-from ml.data_preprocessing import DataCleaner, FeatureEngineer
+from backend.ml.automl import AutoML
+from backend.ml.inference import ModelInference
+from backend.ml.explainability import ModelExplainer
+from backend.ml.data_preprocessing import DataCleaner, FeatureEngineer
 
 class TestAutoML:
     """Test AutoML engine"""

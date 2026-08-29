@@ -1,8 +1,7 @@
-import sys
-sys.path.insert(0, '.')
-sys.path.insert(0, '..')
-
 import logging
+import secrets
+import string
+import random
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,6 +48,40 @@ from ..utils.error_handlers import (
 )
 
 
+def generate_secure_demo_password(length: int = 16) -> str:
+    """
+    Generate a secure random password that GUARANTEES meeting all validation requirements:
+    - At least 8 characters
+    - At least one uppercase letter
+    - At least one lowercase letter
+    - At least one digit
+    - At least one special character from [!@#$%^&*(),.?":{}|<>]
+    
+    This ensures registration will never fail due to weak password validation.
+    """
+    uppercase = string.ascii_uppercase
+    lowercase = string.ascii_lowercase
+    digits = string.digits
+    special_chars = "!@#$%^&*()"  # From the allowed set in validators.py
+    
+    # Start with ONE of each required character type to guarantee compliance
+    password_chars = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase),
+        secrets.choice(digits),
+        secrets.choice(special_chars)
+    ]
+    
+    # Fill remaining length with random choices from all valid character classes
+    all_chars = uppercase + lowercase + digits + special_chars
+    for _ in range(length - 4):
+        password_chars.append(secrets.choice(all_chars))
+    
+    # Shuffle to avoid predictable patterns (e.g., always Aa0!)
+    random.shuffle(password_chars)
+    
+    return ''.join(password_chars)
+
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -72,21 +105,49 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Could not run production validation: {e}")
     
-    # Create default demo user if no users exist
-    try:
-        from ..utils.auth import users_db, register_user
-        if len(list(users_db.keys())) == 0:
-            logger.info("Creating default demo user...")
-            # Note: This will fail validation due to weak password, using a stronger one
-            register_user(
-                username="demo",
-                email="demo@decisera.com",
-                password="Demo@123456",  # Meets password requirements
-                role="admin"
-            )
-            logger.info("✓ Default user created: demo/Demo@123456")
-    except Exception as e:
-        logger.warning(f"Could not create default user: {e}")
+    # Create default demo user if enabled
+    if settings.allow_default_admin:
+        # LOUD WARNING: This should never be enabled in production or shared environments
+        warning_banner = """
+╔════════════════════════════════════════════════════════════════╗
+║  ⚠️  WARNING: DEFAULT ADMIN ACCOUNT ENABLED ⚠️                  ║
+║                                                                ║
+║  A default admin account will be created automatically.        ║
+║  This setting should ONLY be used in local development.        ║
+║                                                                ║
+║  NEVER enable this in:                                         ║
+║  - Shared environments                                         ║
+║  - Staging or production servers                               ║
+║  - Code repositories or CI/CD pipelines                         ║
+║                                                                ║
+║  To disable, set: ALLOW_DEFAULT_ADMIN=false                   ║
+╚════════════════════════════════════════════════════════════════╝
+        """
+        logger.warning(warning_banner)
+        
+        try:
+            from ..utils.auth import users_db, register_user
+            if len(list(users_db.keys())) == 0:
+                # Generate a secure random password that GUARANTEES validation compliance
+                random_password = generate_secure_demo_password()
+                logger.info("Creating default demo user...")
+                register_user(
+                    username="demo",
+                    email="demo@decisera.com",
+                    password=random_password,
+                    role="admin"
+                )
+                # Log the credentials clearly and ONLY ONCE so the developer can capture them
+                logger.warning("=" * 70)
+                logger.warning("DEFAULT DEMO ACCOUNT CREDENTIALS (will not be shown again)")
+                logger.warning(f"  Username: demo")
+                logger.warning(f"  Email:    demo@decisera.com")
+                logger.warning(f"  Password: {random_password}")
+                logger.warning("=" * 70)
+            else:
+                logger.info("Users database already populated; skipping default admin creation.")
+        except Exception as e:
+            logger.error(f"Could not create default admin user: {e}", exc_info=True)
     
     yield
     

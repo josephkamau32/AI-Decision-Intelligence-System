@@ -50,8 +50,19 @@ secrets.json
 .DS_Store
 Thumbs.db
 
-# MLflow
+# MLflow & Databases
 mlruns/
+mlflow.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Artifacts
+models/
+
+# Local runtime storage (user data, API keys, etc.)
+storage/
+uploads/
 
 # Logs
 logs/
