@@ -421,6 +421,7 @@ AI-Decision-Intelligence-System/
 │   │   ├── services/       # API services
 │   │   └── styles/         # CSS & design tokens
 │   └── package.json        # npm deps
+├── scripts/                # Developer & diagnostic utilities (e.g. check_openai_key.py)
 ├── k8s/                    # Kubernetes manifests
 ├── grafana/                # Grafana dashboards
 ├── .github/workflows/      # CI/CD pipelines
@@ -527,6 +528,9 @@ node --version  # Should be 18+
 # Clear browser cache
 # Use incognito mode or Ctrl+Shift+Delete
 ```
+
+### OpenAI API Key Diagnostics
+- Run `python scripts/check_openai_key.py` to verify that your `OPENAI_API_KEY` is loaded and can authenticate with OpenAI.
 
 ### Models not training
 - Check dataset format (CSV must have header row)
