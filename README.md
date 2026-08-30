@@ -142,22 +142,24 @@ python -m venv .venv
 # Activate (Mac/Linux)
 source .venv/bin/activate
 
-# Install dependencies
-cd backend
+# Install dependencies from project root
 pip install -r requirements.txt
 
-# Set environment variables
-copy .env.example .env  # Windows
-cp .env.example env    # Mac/Linux
+# For development & testing dependencies, also install:
+# pip install -r requirements-dev.txt
 
-# Edit .env with your configuration
-# Required: SECRET_KEY, JWT_SECRET_KEY, OPEN
+# Configure environment variables
+copy .env.example .env   # Windows
+cp .env.example .env     # Mac/Linux
 
-AI_API_KEY
+# Edit .env with your configuration:
+# - SECRET_KEY & JWT_SECRET_KEY (generate via: python -c "import secrets; print(secrets.token_urlsafe(32))")
+# - GOOGLE_API_KEY (Required for Gemini AI Copilot)
+# - OPENAI_API_KEY (Optional)
 
 # Run backend server
-cd ..
-.venv\Scripts\python.exe -m uvicorn backend.api.main:app --reload --port 8000
+uvicorn backend.api.main:app --reload --port 8000
+# Or: python -m uvicorn backend.api.main:app --reload --port 8000
 ```
 
 Backend will be available at: **http://localhost:8000**
@@ -304,8 +306,11 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 
 ### Backend Tests
 ```bash
-cd backend
-pytest tests/ -v --cov=api --cov=ml
+# Run all unit tests from project root
+pytest -v
+
+# Run with test coverage
+pytest -v --cov=backend/api --cov=backend/ml
 ```
 
 ### Frontend Tests
@@ -313,9 +318,6 @@ pytest tests/ -v --cov=api --cov=ml
 cd frontend
 npm test
 ```
-
-### Comprehensive Testing Guide
-See [testing_guide.md](.gemini/antigravity/brain/02d93139-4bcb-4961-98fa-2d04ceef996e/testing_guide.md) for detailed testing procedures.
 
 ---
 
@@ -506,7 +508,7 @@ POST /api/v1/copilot/ask
 python --version  # Should be 3.11+
 
 # Reinstall dependencies
-pip install --upgrade -r backend/requirements.txt
+pip install --upgrade -r requirements.txt
 
 # Check virtual environment
 which python  # Should point to .venv
@@ -539,18 +541,10 @@ node --version  # Should be 18+
 - Check backend logs for errors
 
 ### AI Copilot not responding
-- Verify OPENAI_API_KEY in backend `.env`
-- Check API quota/billing
+- Verify `GOOGLE_API_KEY` in project root `.env` (required for Gemini Copilot)
+- Verify `OPENAI_API_KEY` in `.env` if using OpenAI-based workflows
+- Check API quota/billing at Google Cloud Console / OpenAI Platform
 - View backend logs for API errors
-
----
-
-## 📚 Additional Resources
-
-- **Implementation Plan**: `.gemini/antigravity/brain/.../implementation_plan.md`
-- **Walkthrough**: `.gemini/antigravity/brain/.../walkthrough.md`
-- **Testing Guide**: `.gemini/antigravity/brain/.../testing_guide.md`
-- **UI Redesign Summary**: `.gemini/antigravity/brain/.../ui_redesign_summary.md`
 
 ---
 

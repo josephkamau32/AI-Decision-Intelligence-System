@@ -1,5 +1,7 @@
  # Dependencies
 node_modules/
+build/
+dist/
 
 # Python
 __pycache__/

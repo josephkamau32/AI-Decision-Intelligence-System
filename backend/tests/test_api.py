@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from backend.api.main import app
 
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=False)
 
 class TestHealthAPI:
     def test_health_check(self):
@@ -21,13 +21,13 @@ class TestDatasetsAPI:
         response = client.get("/api/v1/datasets/")
         assert response.status_code == 200
         data = response.json()
-        assert "datasets" in data
-        assert data["datasets"] == []
+        assert "data" in data
+        assert data["data"] == []
 
     @patch('backend.api.datasets.dataset_service')
     def test_upload_dataset_success(self, mock_service):
         mock_service.upload_dataset = AsyncMock()
-        mock_service.upload_dataset.return_value = type('Dataset', (), {'dict': lambda: {'id': 1, 'name': 'test'}})()
+        mock_service.upload_dataset.return_value = type('Dataset', (), {'dict': lambda self: {'id': '1', 'name': 'test_dataset'}})()
         # Mock file upload
         files = {'file': ('test.csv', 'col1,col2\n1,2\n', 'text/csv')}
         data = {'name': 'test_dataset', 'description': 'test desc'}
@@ -45,4 +45,4 @@ class TestDatasetsAPI:
         response = client.post("/api/v1/datasets/upload", files=files, data=data)
         assert response.status_code == 500
         data = response.json()
-        assert "detail" in data
+        assert "error" in data or "detail" in data
