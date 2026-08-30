@@ -5,7 +5,7 @@ celery_app = Celery(
     "ai_decision_intelligence",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["backend.tasks"]
+    include=["backend.tasks"],
 )
 
 celery_app.conf.update(

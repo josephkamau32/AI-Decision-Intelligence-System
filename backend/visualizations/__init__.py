@@ -7,9 +7,9 @@ from .forecast_plot import ForecastPlot
 from .interactive_filters import InteractiveFilters
 
 __all__ = [
-    'CorrelationHeatmap',
-    'FeatureImportancePlot',
-    'TrendAnalysisChart',
-    'ForecastPlot',
-    'InteractiveFilters'
+    "CorrelationHeatmap",
+    "FeatureImportancePlot",
+    "TrendAnalysisChart",
+    "ForecastPlot",
+    "InteractiveFilters",
 ]

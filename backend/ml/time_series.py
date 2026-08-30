@@ -2,6 +2,7 @@
 Time-Series Forecasting Models
 Implements Prophet and LSTM models for time-series analysis
 """
+
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional, Tuple, List
@@ -16,6 +17,7 @@ import mlflow.pytorch
 try:
     from prophet import Prophet
     from prophet.diagnostics import cross_validation, performance_metrics
+
     PROPHET_AVAILABLE = True
 except Exception:
     Prophet = None
@@ -34,38 +36,43 @@ logger = logging.getLogger(__name__)
 
 class TimeSeriesDataset(Dataset):
     """PyTorch Dataset for time-series data"""
-    
+
     def __init__(self, data: np.ndarray, seq_length: int = 10):
         self.data = torch.FloatTensor(data)
         self.seq_length = seq_length
-        
+
     def __len__(self):
         return len(self.data) - self.seq_length
-    
+
     def __getitem__(self, idx):
-        x = self.data[idx:idx + self.seq_length]
+        x = self.data[idx : idx + self.seq_length]
         y = self.data[idx + self.seq_length]
         return x, y
 
 
 class LSTMModel(nn.Module):
     """LSTM Neural Network for Time-Series Forecasting"""
-    
-    def __init__(self, input_size: int = 1, hidden_size: int = 64, 
-                 num_layers: int = 2, dropout: float = 0.2):
+
+    def __init__(
+        self,
+        input_size: int = 1,
+        hidden_size: int = 64,
+        num_layers: int = 2,
+        dropout: float = 0.2,
+    ):
         super(LSTMModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        
+
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout if num_layers > 1 else 0,
-            batch_first=True
+            batch_first=True,
         )
         self.fc = nn.Linear(hidden_size, 1)
-        
+
     def forward(self, x):
         # x shape: (batch, seq_len, input_size)
         lstm_out, _ = self.lstm(x)
@@ -79,16 +86,18 @@ class ProphetForecaster:
     Facebook Prophet model wrapper for time-series forecasting
     Handles trend, seasonality, and holiday effects
     """
-    
-    def __init__(self, 
-                 seasonality_mode: str = 'additive',
-                 changepoint_prior_scale: float = 0.05,
-                 yearly_seasonality: bool = 'auto',
-                 weekly_seasonality: bool = 'auto',
-                 daily_seasonality: bool = 'auto'):
+
+    def __init__(
+        self,
+        seasonality_mode: str = "additive",
+        changepoint_prior_scale: float = 0.05,
+        yearly_seasonality: bool = "auto",
+        weekly_seasonality: bool = "auto",
+        daily_seasonality: bool = "auto",
+    ):
         """
         Initialize Prophet model
-        
+
         Args:
             seasonality_mode: 'additive' or 'multiplicative'
             changepoint_prior_scale: Flexibility of trend (higher = more flexible)
@@ -98,101 +107,108 @@ class ProphetForecaster:
         """
         if not PROPHET_AVAILABLE or Prophet is None:
             raise RuntimeError("Prophet is not available or Stan backend is missing")
-            
+
         try:
             self.model = Prophet(
                 seasonality_mode=seasonality_mode,
                 changepoint_prior_scale=changepoint_prior_scale,
                 yearly_seasonality=yearly_seasonality,
                 weekly_seasonality=weekly_seasonality,
-                daily_seasonality=daily_seasonality
+                daily_seasonality=daily_seasonality,
             )
         except Exception as e:
             raise RuntimeError(f"Prophet initialization failed: {e}")
-            
+
         self.is_fitted = False
         self.metrics = {}
-        
+
     def fit(self, df: pd.DataFrame, date_col: str, target_col: str):
         """
         Train Prophet model
-        
+
         Args:
             df: DataFrame with time-series data
             date_col: Name of date column
             target_col: Name of target column
         """
         # Prophet requires 'ds' and 'y' columns
-        train_data = pd.DataFrame({
-            'ds': pd.to_datetime(df[date_col]),
-            'y': df[target_col]
-        })
-        
+        train_data = pd.DataFrame(
+            {"ds": pd.to_datetime(df[date_col]), "y": df[target_col]}
+        )
+
         logger.info(f"Training Prophet model on {len(train_data)} data points")
         self.model.fit(train_data)
         self.is_fitted = True
-        
+
         return self
-        
-    def evaluate(self, df: pd.DataFrame, date_col: str, target_col: str,
-                 horizon: str = '30 days', period: str = '15 days') -> Dict[str, float]:
+
+    def evaluate(
+        self,
+        df: pd.DataFrame,
+        date_col: str,
+        target_col: str,
+        horizon: str = "30 days",
+        period: str = "15 days",
+    ) -> Dict[str, float]:
         """
         Evaluate Prophet model with cross-validation
-        
+
         Args:
             df: DataFrame with time-series data
             date_col: Name of date column
             target_col: Name of target column
             horizon: Forecast horizon for evaluation
             period: Period between cutoff dates
-            
+
         Returns:
             Dictionary of performance metrics (MAPE, RMSE, MAE)
         """
         if not self.is_fitted:
             raise ValueError("Model must be fitted before evaluation")
-            
+
         # Cross validation
         cv_results = cross_validation(
-            self.model, 
+            self.model,
             initial=f"{len(df)//2} days",
-            period=period, 
+            period=period,
             horizon=horizon,
-            parallel="processes"
+            parallel="processes",
         )
-        
+
         self.metrics = performance_metrics(cv_results)
-        logger.info(f"Prophet metrics: {self.metrics[['mape', 'rmse']].mean().to_dict()}")
-        
-        return self.metrics[['mape', 'rmse', 'mae']].mean().to_dict()
-        
-    def predict(self, periods: int = 30, freq: str = 'D') -> pd.DataFrame:
+        logger.info(
+            f"Prophet metrics: {self.metrics[['mape', 'rmse']].mean().to_dict()}"
+        )
+
+        return self.metrics[["mape", "rmse", "mae"]].mean().to_dict()
+
+    def predict(self, periods: int = 30, freq: str = "D") -> pd.DataFrame:
         """
         Generate forecasts
-        
+
         Args:
             periods: Number of periods to forecast
             freq: Frequency ('D' for daily, 'W' for weekly, etc.)
-            
+
         Returns:
             DataFrame with predictions
         """
         if not self.is_fitted:
             raise ValueError("Model must be fitted before predicting")
-            
+
         future = self.model.make_future_dataframe(periods=periods, freq=freq)
         forecast = self.model.predict(future)
-        
-        return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
-    
+
+        return forecast[["ds", "yhat", "yhat_lower", "yhat_upper"]]
+
     def get_components(self) -> Dict[str, Any]:
         """Get seasonality components"""
         if not self.is_fitted:
             raise ValueError("Model must be fitted first")
-        
+
         return {
-            'trend': self.model.params.get('trend'),
-            'seasonality': self.model.seasonalities
+            "trend": self.model.params.get("trend"),
+            "seasonality": self.model.seasonalities,
         }
 
 
@@ -201,18 +217,20 @@ class LSTMForecaster:
     LSTM-based time-series forecasting model
     Handles univariate time-series with neural networks
     """
-    
-    def __init__(self,
-                 seq_length: int = 10,
-                 hidden_size: int = 64,
-                 num_layers: int = 2,
-                 dropout: float = 0.2,
-                 learning_rate: float = 0.001,
-                 epochs: int = 100,
-                 batch_size: int = 32):
+
+    def __init__(
+        self,
+        seq_length: int = 10,
+        hidden_size: int = 64,
+        num_layers: int = 2,
+        dropout: float = 0.2,
+        learning_rate: float = 0.001,
+        epochs: int = 100,
+        batch_size: int = 32,
+    ):
         """
         Initialize LSTM model
-        
+
         Args:
             seq_length: Number of time steps to look back
             hidden_size: Number of LSTM hidden units
@@ -229,16 +247,16 @@ class LSTMForecaster:
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.batch_size = batch_size
-        
+
         self.model = None
         self.scaler = MinMaxScaler()
         self.is_fitted = False
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     def fit(self, df: pd.DataFrame, date_col: str, target_col: str):
         """
         Train LSTM model
-        
+
         Args:
             df: DataFrame with time-series data
             date_col: Name of date column
@@ -247,166 +265,169 @@ class LSTMForecaster:
         # Sort by date
         df = df.sort_values(date_col)
         data = df[target_col].values.reshape(-1, 1)
-        
+
         # Normalize data
         scaled_data = self.scaler.fit_transform(data)
-        
+
         # Create dataset
         dataset = TimeSeriesDataset(scaled_data, self.seq_length)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-        
+
         # Initialize model
         self.model = LSTMModel(
             input_size=1,
             hidden_size=self.hidden_size,
             num_layers=self.num_layers,
-            dropout=self.dropout
+            dropout=self.dropout,
         ).to(self.device)
-        
+
         # Loss and optimizer
         criterion = nn.MSELoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        
+
         # Training loop
         logger.info(f"Training LSTM model for {self.epochs} epochs...")
         self.model.train()
-        
+
         for epoch in range(self.epochs):
             total_loss = 0
             for batch_x, batch_y in dataloader:
                 batch_x = batch_x.to(self.device)
                 batch_y = batch_y.to(self.device)
-                
+
                 # Forward pass
                 outputs = self.model(batch_x)
                 loss = criterion(outputs.squeeze(-1), batch_y.squeeze(-1))
-                
+
                 # Backward pass
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                
+
                 total_loss += loss.item()
-            
+
             if (epoch + 1) % 10 == 0:
                 avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else 0
                 logger.info(f"Epoch [{epoch+1}/{self.epochs}], Loss: {avg_loss:.4f}")
-        
+
         self.is_fitted = True
         logger.info("LSTM training completed")
-        
+
         return self
-    
+
     def predict(self, last_sequence: np.ndarray, periods: int = 30) -> np.ndarray:
         """
         Generate forecasts
-        
+
         Args:
             last_sequence: Last seq_length values from training data
             periods: Number of periods to forecast
-            
+
         Returns:
             Array of predictions
         """
         if not self.is_fitted:
             raise ValueError("Model must be fitted before predicting")
-        
+
         self.model.eval()
         predictions = []
-        
+
         # Normalize last sequence
         current_seq = self.scaler.transform(last_sequence.reshape(-1, 1))
         current_seq = torch.FloatTensor(current_seq).unsqueeze(0).to(self.device)
-        
+
         with torch.no_grad():
             for _ in range(periods):
                 # Predict next value
                 pred = self.model(current_seq)
                 predictions.append(pred.cpu().numpy()[0, 0])
-                
+
                 # Update sequence for next prediction
-                current_seq = torch.cat([current_seq[:, 1:, :], pred.unsqueeze(1)], dim=1)
-        
+                current_seq = torch.cat(
+                    [current_seq[:, 1:, :], pred.unsqueeze(1)], dim=1
+                )
+
         # Denormalize predictions
         predictions = np.array(predictions).reshape(-1, 1)
         predictions = self.scaler.inverse_transform(predictions)
-        
+
         return predictions.flatten()
-    
+
     def save_model(self, filepath: str):
         """Save LSTM model to disk"""
         if not self.is_fitted:
             raise ValueError("Cannot save unfitted model")
-        
-        torch.save({
-            'model_state_dict': self.model.state_dict(),
-            'scaler': self.scaler,
-            'config': {
-                'seq_length': self.seq_length,
-                'hidden_size': self.hidden_size,
-                'num_layers': self.num_layers,
-                'dropout': self.dropout
-            }
-        }, filepath)
+
+        torch.save(
+            {
+                "model_state_dict": self.model.state_dict(),
+                "scaler": self.scaler,
+                "config": {
+                    "seq_length": self.seq_length,
+                    "hidden_size": self.hidden_size,
+                    "num_layers": self.num_layers,
+                    "dropout": self.dropout,
+                },
+            },
+            filepath,
+        )
         logger.info(f"LSTM model saved to {filepath}")
-    
+
     def load_model(self, filepath: str):
         """Load LSTM model from disk"""
         checkpoint = torch.load(filepath, map_location=self.device)
-        
-        self.seq_length = checkpoint['config']['seq_length']
-        self.hidden_size = checkpoint['config']['hidden_size']
-        self.num_layers = checkpoint['config']['num_layers']
-        self.dropout = checkpoint['config']['dropout']
-        
+
+        self.seq_length = checkpoint["config"]["seq_length"]
+        self.hidden_size = checkpoint["config"]["hidden_size"]
+        self.num_layers = checkpoint["config"]["num_layers"]
+        self.dropout = checkpoint["config"]["dropout"]
+
         self.model = LSTMModel(
             input_size=1,
             hidden_size=self.hidden_size,
             num_layers=self.num_layers,
-            dropout=self.dropout
+            dropout=self.dropout,
         ).to(self.device)
-        
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.scaler = checkpoint['scaler']
+
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.scaler = checkpoint["scaler"]
         self.is_fitted = True
-        
+
         logger.info(f"LSTM model loaded from {filepath}")
 
 
 def detect_time_series(df: pd.DataFrame) -> Optional[str]:
     """
     Detect if dataset contains time-series data
-    
+
     Returns:
         Name of date column if found, else None
     """
     for col in df.columns:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             return col
-        
+
         # Try parsing as datetime
         try:
             pd.to_datetime(df[col])
             return col
         except:
             continue
-    
+
     return None
 
 
-def calculate_forecast_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+def calculate_forecast_metrics(
+    y_true: np.ndarray, y_pred: np.ndarray
+) -> Dict[str, float]:
     """
     Calculate forecasting metrics
-    
+
     Returns:
         Dictionary with MAE, RMSE, MAPE
     """
     mae = np.mean(np.abs(y_true - y_pred))
     rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
     mape = np.mean(np.abs((y_true - y_pred) / (y_true + 1e-10))) * 100
-    
-    return {
-        'mae': float(mae),
-        'rmse': float(rmse),
-        'mape': float(mape)
-    }
+
+    return {"mae": float(mae), "rmse": float(rmse), "mape": float(mape)}

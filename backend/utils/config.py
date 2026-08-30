@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
 import secrets
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -30,7 +31,7 @@ class Settings(BaseSettings):
 
     # OpenAI
     openai_api_key: str = ""
-    
+
     # Google Gemini
     google_api_key: str = ""
 
@@ -48,11 +49,14 @@ class Settings(BaseSettings):
     cache_ttl: int = 300  # 5 minutes
 
     # Default Admin User (for development only)
-    allow_default_admin: bool = False  # Gate default admin creation behind explicit flag
+    allow_default_admin: bool = (
+        False  # Gate default admin creation behind explicit flag
+    )
 
     # CORS
     cors_credentials: bool = True
     cors_methods: List[str] = ["*"]
     cors_headers: List[str] = ["*"]
+
 
 settings = Settings()

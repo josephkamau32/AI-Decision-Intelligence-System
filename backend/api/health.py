@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
     """Basic health check endpoint."""
@@ -15,5 +16,5 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         version=settings.version,
-        timestamp=datetime.utcnow().isoformat()
+        timestamp=datetime.utcnow().isoformat(),
     )
