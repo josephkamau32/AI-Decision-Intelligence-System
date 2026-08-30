@@ -1,0 +1,8 @@
+node_modules
+build
+.git
+.gitignore
+.vercel
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
