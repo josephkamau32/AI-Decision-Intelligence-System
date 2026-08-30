@@ -37,13 +37,15 @@ class ModelExplainer:
             self.explainer = shap.TreeExplainer(self.model)
             self.explainer_type = "tree"
             logger.info("Initialized TreeExplainer")
-        except:
+        except (TypeError, ValueError, AttributeError) as exc:
+            logger.debug("TreeExplainer not applicable (%s), attempting LinearExplainer", exc)
             try:
                 # Try LinearExplainer (for linear models)
                 self.explainer = shap.LinearExplainer(self.model, self.X_train)
                 self.explainer_type = "linear"
                 logger.info("Initialized LinearExplainer")
-            except:
+            except (TypeError, ValueError, AttributeError) as exc:
+                logger.debug("LinearExplainer not applicable (%s), falling back to KernelExplainer", exc)
                 # Fall back to KernelExplainer (model-agnostic but slower)
                 if self.X_train is not None:
                     # Sample for efficiency

@@ -1,5 +1,13 @@
-from alibi_detect.cd import TabularDrift
-from alibi_detect.utils.saving import save_detector, load_detector
+try:
+    from alibi_detect.cd import TabularDrift
+    from alibi_detect.utils.saving import save_detector, load_detector
+    HAS_ALIBI_DETECT = True
+except ImportError:
+    TabularDrift = None
+    save_detector = None
+    load_detector = None
+    HAS_ALIBI_DETECT = False
+
 import numpy as np
 import pandas as pd
 import os

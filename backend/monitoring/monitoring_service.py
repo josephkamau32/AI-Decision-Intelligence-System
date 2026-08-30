@@ -5,6 +5,10 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional
 import os
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MonitoringService:
     def __init__(self):
@@ -96,8 +100,8 @@ class MonitoringService:
                 path = os.path.join(self.monitoring_dir, f"{model_id}_performance.json")
                 self.performance_monitors[model_id].load_state(path)
 
-        except Exception as e:
-            print(f"Failed to load monitoring state for {model_id}: {e}")
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+            logger.error("Failed to load monitoring state for %s: %s", model_id, e)
 
     def save_monitoring_state(self, model_id: str):
         """Save monitoring state to disk."""
@@ -116,7 +120,7 @@ class MonitoringService:
                 path = os.path.join(self.monitoring_dir, f"{model_id}_drift")
                 self.drift_detectors[model_id].save_detector(path)
 
-        except Exception as e:
-            print(f"Failed to save monitoring state for {model_id}: {e}")
+        except (OSError, TypeError, ValueError) as e:
+            logger.error("Failed to save monitoring state for %s: %s", model_id, e)
 
 monitoring_service = MonitoringService()

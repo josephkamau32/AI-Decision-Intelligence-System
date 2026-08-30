@@ -179,7 +179,8 @@ class ModelService:
             else:
                 confidence = None
                 probabilities = None
-        except:
+        except (AttributeError, ValueError, IndexError, TypeError) as exc:
+            logger.debug("Could not compute prediction confidence for model %s: %s", model_id, exc)
             confidence = None
             probabilities = None
         
@@ -218,7 +219,8 @@ class ModelService:
             else:
                 confidences = [None] * len(predictions)
                 probs = [None] * len(predictions)
-        except:
+        except (AttributeError, ValueError, IndexError, TypeError) as exc:
+            logger.debug("Could not compute batch prediction probabilities for model %s: %s", model_id, exc)
             confidences = [None] * len(predictions)
             probs = [None] * len(predictions)
         

@@ -1,21 +1,57 @@
-# BARE MINIMUM dependencies - Pure Python only, no compilation
-# Core FastAPI
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+# ==============================================================================
+# Production Dependencies for AI Decision Intelligence System
+# ==============================================================================
+
+# Core FastAPI & ASGI
+fastapi==0.125.0
+uvicorn[standard]==0.38.0
 pydantic==2.10.5
 pydantic-settings==2.7.1
+email-validator==2.3.0
+python-multipart==0.0.21
 
-# Authentication
-python-jose[cryptography]==3.3.0  
+# Authentication & Security
+python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 
-# Utilities
-python-multipart==0.0.6
+# Utilities & Networking
 python-dotenv==1.0.0
-httpx==0.26.0
+aiofiles==25.1.0
+httpx==0.28.1
+slowapi==0.1.9
+prometheus-client==0.23.1
 
-# Direct OpenAI (no langchain, no tiktoken)
-openai==1.7.2
+# Data Processing & Storage Formats
+numpy==2.3.5
+pandas==2.3.3
+openpyxl==3.1.5
+pyarrow==22.0.0
 
-# Monitoring
-prometheus-client==0.19.0
+# Machine Learning Core
+scikit-learn==1.8.0
+xgboost==3.1.2
+lightgbm==4.6.0
+joblib==1.5.3
+shap==0.50.0
+matplotlib==3.10.8
+optuna==4.7.0
+plotly==6.5.0
+
+# Deep Learning & Time Series
+torch==2.9.1
+prophet==1.2.1
+
+# MLOps & Experiment Tracking
+mlflow==3.7.0
+
+# Asynchronous Tasks & Caching
+celery==5.4.0
+redis==7.1.0
+
+# AI Copilot & LLMs
+openai==2.14.0
+tiktoken==0.12.0
+langchain==1.2.0
+langchain-openai==1.1.6
+google-generativeai==0.8.4

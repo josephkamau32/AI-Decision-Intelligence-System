@@ -159,7 +159,8 @@ class ModelInference:
                     'confidence': confidence,
                     'probabilities': probabilities[i].tolist() if probabilities is not None else None
                 })
-        except:
+        except (ValueError, AttributeError, IndexError, TypeError) as exc:
+            logger.debug("Probabilities unavailable for confidence calculation: %s", exc)
             # No probabilities available, return without confidence
             for pred in predictions:
                 results.append({

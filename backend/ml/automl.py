@@ -129,8 +129,8 @@ class AutoML:
         if len(np.unique(y_true)) == 2 and y_prob is not None:
             try:
                 metrics['roc_auc'] = float(roc_auc_score(y_true, y_prob[:, 1]))
-            except:
-                pass
+            except (ValueError, IndexError, TypeError) as exc:
+                logger.debug("ROC-AUC score computation skipped: %s", exc)
         
         return metrics
     
