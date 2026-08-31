@@ -1,6 +1,7 @@
-from pydantic import Field, AliasChoices
+from pydantic import Field, AliasChoices, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional, List
+from typing import Optional, List, Union
+import json
 import secrets
 
 
@@ -24,7 +25,30 @@ class Settings(BaseSettings):
     jwt_secret_key: str = secrets.token_urlsafe(32)
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = 30
-    allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    allowed_origins: List[str] = Field(
+        default=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "https://decisera.vercel.app",
+        ],
+        validation_alias=AliasChoices(
+            "ALLOWED_ORIGINS", "allowed_origins", "CORS_ORIGINS", "cors_origins"
+        ),
+        description="Allowed origins for CORS requests",
+    )
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     # File upload
     upload_dir: str = "uploads"

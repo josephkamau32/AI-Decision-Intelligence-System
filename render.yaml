@@ -18,5 +18,7 @@ services:
         value: "false"
       - key: ENVIRONMENT
         value: production
+      - key: ALLOWED_ORIGINS
+        value: "https://decisera.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
     healthCheckPath: /api/v1/health
 
