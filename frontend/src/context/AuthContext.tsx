@@ -76,6 +76,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    const parseErrorMessage = (data: any, defaultMsg: string): string => {
+        if (!data) return defaultMsg;
+        if (data.error && typeof data.error.message === 'string') {
+            return data.error.message;
+        }
+        if (typeof data.detail === 'string') {
+            return data.detail;
+        }
+        if (Array.isArray(data.detail) && data.detail.length > 0) {
+            const msgs = data.detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ');
+            return msgs || defaultMsg;
+        }
+        if (typeof data.message === 'string') {
+            return data.message;
+        }
+        return defaultMsg;
+    };
+
     const login = async (username: string, password: string) => {
         try {
             const response = await fetch(`${API_URL}/api/v1/users/login`, {
@@ -87,8 +105,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Login failed');
+                let errorMsg = 'Login failed';
+                try {
+                    const errorData = await response.json();
+                    errorMsg = parseErrorMessage(errorData, 'Login failed');
+                } catch {
+                    errorMsg = response.statusText || 'Login failed';
+                }
+                throw new Error(errorMsg);
             }
 
             const data = await response.json();
@@ -120,8 +144,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Registration failed');
+                let errorMsg = 'Registration failed';
+                try {
+                    const errorData = await response.json();
+                    errorMsg = parseErrorMessage(errorData, 'Registration failed');
+                } catch {
+                    errorMsg = response.statusText || 'Registration failed';
+                }
+                throw new Error(errorMsg);
             }
 
             // Auto-login after registration

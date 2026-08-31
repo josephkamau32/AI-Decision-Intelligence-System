@@ -23,7 +23,7 @@ const Login: React.FC = () => {
             await login(formData.username, formData.password);
             navigate('/dashboard');
         } catch (err: any) {
-            setError(err.response?.data?.detail || 'Invalid credentials. Please try again.');
+            setError(err.message || 'Invalid credentials. Please try again.');
         } finally {
             setLoading(false);
         }

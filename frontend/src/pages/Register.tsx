@@ -3,6 +3,25 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import styles from './Login.module.css';
 
+interface PasswordValidation {
+    minLength: boolean;
+    hasUpper: boolean;
+    hasLower: boolean;
+    hasDigit: boolean;
+    hasSpecial: boolean;
+    isValid: boolean;
+}
+
+const checkPasswordRules = (pwd: string): PasswordValidation => {
+    const minLength = pwd.length >= 8;
+    const hasUpper = /[A-Z]/.test(pwd);
+    const hasLower = /[a-z]/.test(pwd);
+    const hasDigit = /\d/.test(pwd);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
+    const isValid = minLength && hasUpper && hasLower && hasDigit && hasSpecial;
+    return { minLength, hasUpper, hasLower, hasDigit, hasSpecial, isValid };
+};
+
 const Register: React.FC = () => {
     const [formData, setFormData] = useState({
         username: '',
@@ -16,6 +35,8 @@ const Register: React.FC = () => {
     const { register } = useAuth();
     const navigate = useNavigate();
 
+    const pwdRules = checkPasswordRules(formData.password);
+
     const validateForm = () => {
         const newErrors: { [key: string]: string } = {};
 
@@ -28,8 +49,15 @@ const Register: React.FC = () => {
             newErrors.email = 'Please enter a valid email address';
         }
 
-        if (formData.password.length < 6) {
-            newErrors.password = 'Password must be at least 6 characters';
+        const rules = checkPasswordRules(formData.password);
+        if (!rules.isValid) {
+            const missing: string[] = [];
+            if (!rules.minLength) missing.push('at least 8 characters');
+            if (!rules.hasUpper) missing.push('one uppercase letter');
+            if (!rules.hasLower) missing.push('one lowercase letter');
+            if (!rules.hasDigit) missing.push('one digit');
+            if (!rules.hasSpecial) missing.push('one special character');
+            newErrors.password = `Password must contain: ${missing.join(', ')}`;
         }
 
         if (formData.password !== formData.confirmPassword) {
@@ -40,11 +68,13 @@ const Register: React.FC = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const getPasswordStrength = (password: string) => {
-        if (password.length < 6) return 0;
-        if (password.length < 8) return 1;
-        if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) return 3;
-        return 2;
+    const getPasswordStrength = (pwd: string) => {
+        if (!pwd) return 0;
+        const rules = checkPasswordRules(pwd);
+        const metCount = [rules.minLength, rules.hasUpper, rules.hasLower, rules.hasDigit, rules.hasSpecial].filter(Boolean).length;
+        if (metCount <= 2) return 1;
+        if (metCount <= 4) return 2;
+        return 3;
     };
 
     const passwordStrength = getPasswordStrength(formData.password);
@@ -63,7 +93,7 @@ const Register: React.FC = () => {
             navigate('/dashboard');
         } catch (err: any) {
             setErrors({
-                submit: err.response?.data?.detail || 'Registration failed. Please try again.'
+                submit: err.message || 'Registration failed. Please try again.'
             });
         } finally {
             setLoading(false);
@@ -223,11 +253,35 @@ const Register: React.FC = () => {
                                 autoComplete="new-password"
                             />
                             {formData.password && (
-                                <div className={styles.passwordStrength}>
-                                    <div className={`${styles.strengthBar} ${passwordStrength >= 1 ? styles.weak : ''}`}></div>
-                                    <div className={`${styles.strengthBar} ${passwordStrength >= 2 ? styles.medium : ''}`}></div>
-                                    <div className={`${styles.strengthBar} ${passwordStrength >= 3 ? styles.strong : ''}`}></div>
-                                </div>
+                                <>
+                                    <div className={styles.passwordStrength}>
+                                        <div className={`${styles.strengthBar} ${passwordStrength >= 1 ? styles.weak : ''}`}></div>
+                                        <div className={`${styles.strengthBar} ${passwordStrength >= 2 ? styles.medium : ''}`}></div>
+                                        <div className={`${styles.strengthBar} ${passwordStrength >= 3 ? styles.strong : ''}`}></div>
+                                    </div>
+                                    <div className={styles.passwordRequirements}>
+                                        <div className={`${styles.requirementItem} ${pwdRules.minLength ? styles.met : styles.unmet}`}>
+                                            <span className={styles.requirementIcon}>{pwdRules.minLength ? '✓' : '○'}</span>
+                                            <span>At least 8 characters</span>
+                                        </div>
+                                        <div className={`${styles.requirementItem} ${pwdRules.hasUpper ? styles.met : styles.unmet}`}>
+                                            <span className={styles.requirementIcon}>{pwdRules.hasUpper ? '✓' : '○'}</span>
+                                            <span>At least one uppercase letter (A-Z)</span>
+                                        </div>
+                                        <div className={`${styles.requirementItem} ${pwdRules.hasLower ? styles.met : styles.unmet}`}>
+                                            <span className={styles.requirementIcon}>{pwdRules.hasLower ? '✓' : '○'}</span>
+                                            <span>At least one lowercase letter (a-z)</span>
+                                        </div>
+                                        <div className={`${styles.requirementItem} ${pwdRules.hasDigit ? styles.met : styles.unmet}`}>
+                                            <span className={styles.requirementIcon}>{pwdRules.hasDigit ? '✓' : '○'}</span>
+                                            <span>At least one digit (0-9)</span>
+                                        </div>
+                                        <div className={`${styles.requirementItem} ${pwdRules.hasSpecial ? styles.met : styles.unmet}`}>
+                                            <span className={styles.requirementIcon}>{pwdRules.hasSpecial ? '✓' : '○'}</span>
+                                            <span>At least one special character (!@#$%^&*...)</span>
+                                        </div>
+                                    </div>
+                                </>
                             )}
                             {errors.password && (
                                 <span className={styles.error}>{errors.password}</span>
