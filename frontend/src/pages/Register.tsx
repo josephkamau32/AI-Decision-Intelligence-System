@@ -234,6 +234,9 @@ const Register: React.FC = () => {
                             <label className={styles.label} htmlFor="password">
                                 Password
                             </label>
+                            <span className={styles.passwordHint}>
+                                Must be at least 8 characters with uppercase, lowercase, number, and special character
+                            </span>
                             <input
                                 id="password"
                                 type="password"

@@ -61,10 +61,22 @@ api.interceptors.response.use(
                     console.error(`API error: ${status}`);
             }
 
+            // Extract error message safely from various backend error formats
+            let errorMessage = 'An error occurred';
+            if ((data as any)?.error?.message && typeof (data as any).error.message === 'string') {
+                errorMessage = (data as any).error.message;
+            } else if (typeof (data as any)?.detail === 'string') {
+                errorMessage = (data as any).detail;
+            } else if (Array.isArray((data as any)?.detail) && (data as any).detail.length > 0) {
+                errorMessage = (data as any).detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ');
+            } else if (typeof (data as any)?.message === 'string') {
+                errorMessage = (data as any).message;
+            }
+
             // Return structured error
             return Promise.reject({
                 status,
-                message: (data as any)?.error?.message || 'An error occurred',
+                message: errorMessage,
                 data
             });
         } else if (error.request) {
