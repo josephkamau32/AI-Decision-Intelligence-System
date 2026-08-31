@@ -1,3 +1,4 @@
+from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
 import secrets
@@ -8,7 +9,11 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "Decisera API"
-    debug_mode: bool = True  # Enable for local development
+    debug_mode: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("DEBUG_MODE", "DEBUG", "debug_mode", "debug"),
+        description="Enable debug mode (stack traces, open CORS for local testing)",
+    )
     version: str = "1.0.0"
     api_v1_prefix: str = "/api/v1"
 

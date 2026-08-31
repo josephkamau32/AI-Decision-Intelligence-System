@@ -14,4 +14,9 @@ services:
         value: 8000
       - key: PYTHONPATH
         value: .
+      - key: DEBUG_MODE
+        value: "false"
+      - key: ENVIRONMENT
+        value: production
     healthCheckPath: /api/v1/health
+
