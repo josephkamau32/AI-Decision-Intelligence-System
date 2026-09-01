@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = secrets.token_urlsafe(32)
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = 30
-    allowed_origins: List[str] = Field(
+    allowed_origins: Union[List[str], str] = Field(
         default=[
             "http://localhost:3000",
             "http://127.0.0.1:3000",
@@ -37,14 +37,16 @@ class Settings(BaseSettings):
         description="Allowed origins for CORS requests",
     )
 
-    @field_validator("allowed_origins", mode="before")
+    @field_validator("allowed_origins")
     @classmethod
     def parse_allowed_origins(cls, v: Union[str, List[str]]) -> List[str]:
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
                 try:
-                    return json.loads(v)
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(o).strip() for o in parsed if str(o).strip()]
                 except Exception:
                     pass
             return [origin.strip() for origin in v.split(",") if origin.strip()]
