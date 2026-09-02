@@ -1,39 +1,96 @@
+/* ========== CARD — Precision Foundry ========== */
+
 .card {
-    background: var(--color-surface);
-    border-radius: var(--radius-xl);
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--color-border);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-card);
     transition: all var(--transition-base);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle top inset highlight for depth */
+.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+[data-theme="dark"] .card::before {
+    opacity: 1;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+}
+
+/* Variants */
+.default {
+    background: var(--bg-surface);
 }
 
 .glass {
-    background: var(--glass-background);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-color: var(--glass-border);
     box-shadow: var(--glass-shadow);
 }
 
-.gradient {
-    background: var(--gradient-primary);
-    color: white;
-    border: none;
+[data-theme="dark"] .glass {
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
 }
 
-.gradient * {
-    color: white;
+.gradient {
+    background: var(--bg-surface);
+    background-image: var(--gradient-surface);
+    border-color: var(--border-accent);
+}
+
+/* Hoverable */
+.hoverable {
+    cursor: pointer;
 }
 
 .hoverable:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-xl);
+    border-color: var(--border-default);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-1px);
 }
 
+[data-theme="dark"] .hoverable:hover {
+    border-color: var(--border-default);
+}
+
+/* Clickable */
 .clickable {
     cursor: pointer;
 }
 
 .clickable:active {
-    transform: translateY(-2px);
+    transform: scale(0.995);
+}
+
+/* Entrance animation support */
+.card.animated {
+    animation: cardEnter 0.35s var(--ease-smooth) forwards;
+    animation-delay: calc(var(--stagger, 0) * 60ms);
+    opacity: 0;
+}
+
+@keyframes cardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

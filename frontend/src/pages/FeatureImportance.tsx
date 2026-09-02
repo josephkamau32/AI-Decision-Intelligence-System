@@ -1,112 +1,184 @@
 import React, { useEffect, useState } from 'react';
+import { getModels, ModelSummary, getGlobalExplanations } from '../services/modelService';
+import { getFeatureImportanceForModel } from '../services/visualizationService';
+import { useToast } from '../context/ToastProvider';
+import { BarChart3, HelpCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import SkeletonLoader from '../components/ui/SkeletonLoader';
 import styles from './FeatureImportance.module.css';
 
 interface Feature {
-  name: string;
-  importance: number;
-  category: string;
+    name: string;
+    importance: number;
 }
 
 const FeatureImportance: React.FC = () => {
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [loading, setLoading] = useState(true);
+    const [models, setModels] = useState<ModelSummary[]>([]);
+    const [selectedModelId, setSelectedModelId] = useState('');
+    const [features, setFeatures] = useState<Feature[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [featuresLoading, setFeaturesLoading] = useState(false);
+    const [showTooltip, setShowTooltip] = useState(false);
+    const { addToast } = useToast();
 
-  useEffect(() => {
-    // Simulate loading feature importance data
-    setTimeout(() => {
-      setFeatures([
-        { name: 'Customer Lifetime Value', importance: 95, category: 'Financial' },
-        { name: 'Purchase Frequency', importance: 88, category: 'Behavioral' },
-        { name: 'Average Order Value', importance: 82, category: 'Financial' },
-        { name: 'Days Since Last Purchase', importance: 76, category: 'Temporal' },
-        { name: 'Customer Age', importance: 71, category: 'Demographic' },
-        { name: 'Product Category Preference', importance: 68, category: 'Behavioral' },
-        { name: 'Account Age', importance: 62, category: 'Temporal' },
-        { name: 'Support Tickets', importance: 58, category: 'Service' },
-        { name: 'Email Engagement Rate', importance: 54, category: 'Marketing' },
-        { name: 'Geographic Region', importance: 49, category: 'Demographic' },
-      ]);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const data = await getModels();
+                const list = Array.isArray(data) ? data : (data as any)?.models || [];
+                setModels(list);
+                if (list.length > 0) {
+                    setSelectedModelId(list[0].model_id);
+                }
+            } catch {
+                addToast('Failed to load models', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchModels();
+    }, []);
 
-  const getBarColor = (importance: number) => {
-    if (importance >= 80) return styles.barHigh;
-    if (importance >= 60) return styles.barMedium;
-    return styles.barLow;
-  };
+    useEffect(() => {
+        if (!selectedModelId) return;
+        const fetchFeatures = async () => {
+            setFeaturesLoading(true);
+            try {
+                // Try feature importance endpoint first, fallback to SHAP
+                let data: any;
+                try {
+                    data = await getFeatureImportanceForModel(selectedModelId);
+                } catch {
+                    data = await getGlobalExplanations(selectedModelId);
+                }
 
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      Financial: styles.categoryFinancial,
-      Behavioral: styles.categoryBehavioral,
-      Temporal: styles.categoryTemporal,
-      Demographic: styles.categoryDemographic,
-      Service: styles.categoryService,
-      Marketing: styles.categoryMarketing,
-    };
-    return colors[category] || styles.categoryDefault;
-  };
+                // Normalize response format
+                let featureList: Feature[] = [];
+                if (Array.isArray(data)) {
+                    featureList = data.map((f: any) => ({
+                        name: f.feature || f.name || 'unknown',
+                        importance: f.importance || f.value || 0
+                    }));
+                } else if (data?.feature_importance) {
+                    featureList = Object.entries(data.feature_importance).map(([name, val]) => ({
+                        name,
+                        importance: val as number
+                    }));
+                } else if (data?.features) {
+                    featureList = data.features;
+                }
 
-  return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Feature Importance</h1>
-          <p className={styles.subtitle}>Understand which features drive your model predictions</p>
-        </div>
-      </div>
+                featureList.sort((a, b) => b.importance - a.importance);
+                setFeatures(featureList);
+            } catch {
+                setFeatures([]);
+                addToast('Failed to load feature importance', 'error');
+            } finally {
+                setFeaturesLoading(false);
+            }
+        };
+        fetchFeatures();
+    }, [selectedModelId]);
 
-      <Card variant="glass" className={styles.chartCard}>
-        {loading ? (
-          <SkeletonLoader variant="rect" height={600} />
-        ) : (
-          <div className={styles.chart}>
-            <div className={styles.features}>
-              {features.map((feature, index) => (
-                <div key={index} className={styles.featureRow}>
-                  <div className={styles.featureInfo}>
-                    <span className={styles.featureName}>{feature.name}</span>
-                    <span className={`${styles.featureCategory} ${getCategoryColor(feature.category)}`}>
-                      {feature.category}
-                    </span>
-                  </div>
-                  <div className={styles.barContainer}>
-                    <div
-                      className={`${styles.bar} ${getBarColor(feature.importance)}`}
-                      style={{ width: `${feature.importance}%` }}
+    const safeFeatures = Array.isArray(features) ? features : [];
+    const maxImportance = Math.max(...safeFeatures.map((f) => f.importance), 0.001);
+
+    return (
+        <div className={styles.container}>
+            <div className={styles.pageHeader}>
+                <div className={styles.titleRow}>
+                    <h1 className={styles.pageTitle}>Feature Importance</h1>
+                    <button
+                        className={styles.helpBtn}
+                        onMouseEnter={() => setShowTooltip(true)}
+                        onMouseLeave={() => setShowTooltip(false)}
+                        aria-label="What is feature importance?"
                     >
-                      <span className={styles.barLabel}>{feature.importance}%</span>
-                    </div>
-                  </div>
+                        <HelpCircle size={16} />
+                        {showTooltip && (
+                            <div className={styles.tooltip}>
+                                Feature importance shows which input variables have the most influence
+                                on model predictions. Higher values mean the feature has more impact on
+                                the model's output. This is calculated using SHAP values or model-native
+                                importance scores.
+                            </div>
+                        )}
+                    </button>
                 </div>
-              ))}
+                <p className={styles.pageSubtitle}>
+                    {safeFeatures.length > 0
+                        ? `${safeFeatures.length} features ranked by importance`
+                        : 'Select a model to view feature importance'
+                    }
+                </p>
             </div>
-          </div>
-        )}
-      </Card>
 
-      <div className={styles.infoGrid}>
-        <Card variant="glass" className={styles.infoCard}>
-          <h3 className={styles.infoTitle}>What is Feature Importance?</h3>
-          <p className={styles.infoText}>
-            Feature importance measures how much each input feature contributes to the model's predictions.
-            Higher values indicate features that have more influence on the model's decisions.
-          </p>
-        </Card>
+            {/* Model Selector */}
+            <div className={styles.controls}>
+                <div className={styles.selectField}>
+                    <label className={styles.selectLabel}>Model</label>
+                    <select
+                        className={styles.selectInput}
+                        value={selectedModelId}
+                        onChange={(e) => setSelectedModelId(e.target.value)}
+                        disabled={loading}
+                    >
+                        <option value="">Select a model...</option>
+                        {Array.isArray(models) && models.map((m) => (
+                            <option key={m.model_id} value={m.model_id}>
+                                {m.model_type} — {m.target_column}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
 
-        <Card variant="glass" className={styles.infoCard}>
-          <h3 className={styles.infoTitle}>How to Interpret</h3>
-          <p className={styles.infoText}>
-            Focus on the top features for model optimization. Features with low importance might be
-            candidates for removal to simplify the model and reduce overfitting.
-          </p>
-        </Card>
-      </div>
-    </div>
-  );
+            {/* Chart */}
+            {loading || featuresLoading ? (
+                <Card><SkeletonLoader variant="rect" height={300} /></Card>
+            ) : !selectedModelId ? (
+                <Card className={styles.emptyCard}>
+                    <div className={styles.empty}>
+                        <BarChart3 size={40} className={styles.emptyIcon} />
+                        <h3 className={styles.emptyTitle}>Select a model</h3>
+                        <p className={styles.emptyDesc}>Choose a trained model to view its feature importance scores</p>
+                    </div>
+                </Card>
+            ) : safeFeatures.length === 0 ? (
+                <Card className={styles.emptyCard}>
+                    <div className={styles.empty}>
+                        <BarChart3 size={40} className={styles.emptyIcon} />
+                        <h3 className={styles.emptyTitle}>No feature data available</h3>
+                        <p className={styles.emptyDesc}>This model may not have computed importance scores yet</p>
+                    </div>
+                </Card>
+            ) : (
+                <Card className={styles.chartCard}>
+                    <div className={styles.barChart}>
+                        {safeFeatures.slice(0, 15).map((feat, i) => {
+                            const pct = (feat.importance / maxImportance) * 100;
+                            return (
+                                <div key={i} className={styles.barRow}>
+                                    <div className={styles.barLabel} title={feat.name}>
+                                        {feat.name}
+                                    </div>
+                                    <div className={styles.barTrack}>
+                                        <div
+                                            className={styles.barFill}
+                                            style={{ width: `${pct}%` }}
+                                        />
+                                    </div>
+                                    <div className={styles.barValue}>
+                                        {feat.importance.toFixed(4)}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+            )}
+        </div>
+    );
 };
 
 export default FeatureImportance;

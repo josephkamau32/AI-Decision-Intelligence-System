@@ -1,12 +1,14 @@
+/* ========== TOAST — Precision Foundry ========== */
+
 .container {
     position: fixed;
-    top: var(--spacing-xl);
-    right: var(--spacing-xl);
-    z-index: var(--z-tooltip);
+    top: var(--space-4);
+    right: var(--space-4);
+    z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
-    max-width: 420px;
+    gap: var(--space-2);
+    max-width: 400px;
     width: 100%;
     pointer-events: none;
 }
@@ -14,89 +16,116 @@
 .toast {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
-    padding: var(--spacing-md);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    animation: slideInRight var(--transition-base) ease-out;
-    pointer-events: all;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    pointer-events: auto;
+    animation: toastIn 0.35s var(--ease-spring) forwards;
+    position: relative;
+    overflow: hidden;
 }
 
-.toast.success {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+/* Left accent border */
+.toast::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
 }
 
-.toast.error {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95));
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+/* Auto-dismiss progress bar */
+.toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    animation: progressBar 5s linear forwards;
 }
 
-.toast.warning {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(217, 119, 6, 0.95));
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
+/* Type colors */
+.success::before { background: var(--status-success); }
+.success::after { background: var(--status-success); opacity: 0.3; }
+.success .icon { color: var(--status-success); }
 
-.toast.info {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(37, 99, 235, 0.95));
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
+.error::before { background: var(--status-error); }
+.error::after { background: var(--status-error); opacity: 0.3; }
+.error .icon { color: var(--status-error); }
+
+.warning::before { background: var(--status-warning); }
+.warning::after { background: var(--status-warning); opacity: 0.3; }
+.warning .icon { color: var(--status-warning); }
+
+.info::before { background: var(--status-info); }
+.info::after { background: var(--status-info); opacity: 0.3; }
+.info .icon { color: var(--status-info); }
 
 .content {
     display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
+    align-items: center;
+    gap: var(--space-2-5);
     flex: 1;
+    min-width: 0;
 }
 
 .icon {
-    width: 20px;
-    height: 20px;
     flex-shrink: 0;
-    margin-top: 2px;
 }
 
 .message {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: var(--leading-snug);
     margin: 0;
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-normal);
-    font-weight: var(--font-weight-medium);
 }
 
 .closeButton {
-    background: transparent;
-    border: none;
-    color: inherit;
-    cursor: pointer;
-    padding: 0;
-    margin-left: var(--spacing-sm);
-    width: 20px;
-    height: 20px;
     flex-shrink: 0;
-    opacity: 0.8;
-    transition: opacity var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    padding: 0;
 }
 
 .closeButton:hover {
-    opacity: 1;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
 }
 
-.closeButton svg {
-    width: 100%;
-    height: 100%;
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateX(24px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
 }
 
-@media (max-width: 640px) {
+@keyframes progressBar {
+    from { width: 100%; }
+    to { width: 0%; }
+}
+
+@media (max-width: 480px) {
     .container {
-        top: var(--spacing-md);
-        right: var(--spacing-md);
-        left: var(--spacing-md);
+        left: var(--space-4);
+        right: var(--space-4);
         max-width: none;
     }
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Sparkles, ArrowLeft, Loader2, Check, Circle } from 'lucide-react';
 import styles from './Login.module.css';
 
 interface PasswordValidation {
@@ -37,6 +38,17 @@ const Register: React.FC = () => {
 
     const pwdRules = checkPasswordRules(formData.password);
 
+    const getPasswordStrength = (pwd: string): number => {
+        if (!pwd) return 0;
+        const rules = checkPasswordRules(pwd);
+        const metCount = [rules.minLength, rules.hasUpper, rules.hasLower, rules.hasDigit, rules.hasSpecial].filter(Boolean).length;
+        if (metCount <= 2) return 1;
+        if (metCount <= 4) return 2;
+        return 3;
+    };
+
+    const passwordStrength = getPasswordStrength(formData.password);
+
     const validateForm = () => {
         const newErrors: { [key: string]: string } = {};
 
@@ -68,26 +80,12 @@ const Register: React.FC = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const getPasswordStrength = (pwd: string) => {
-        if (!pwd) return 0;
-        const rules = checkPasswordRules(pwd);
-        const metCount = [rules.minLength, rules.hasUpper, rules.hasLower, rules.hasDigit, rules.hasSpecial].filter(Boolean).length;
-        if (metCount <= 2) return 1;
-        if (metCount <= 4) return 2;
-        return 3;
-    };
-
-    const passwordStrength = getPasswordStrength(formData.password);
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!validateForm()) {
-            return;
-        }
+        if (!validateForm()) return;
 
         setLoading(true);
-
         try {
             await register(formData.username, formData.email, formData.password);
             navigate('/dashboard');
@@ -100,247 +98,167 @@ const Register: React.FC = () => {
         }
     };
 
+    const ruleItems = [
+        { met: pwdRules.minLength, label: 'At least 8 characters' },
+        { met: pwdRules.hasUpper, label: 'One uppercase letter' },
+        { met: pwdRules.hasLower, label: 'One lowercase letter' },
+        { met: pwdRules.hasDigit, label: 'One digit' },
+        { met: pwdRules.hasSpecial, label: 'One special character' },
+    ];
+
     return (
         <div className={styles.authPage}>
-            {/* Left Panel - Branding */}
+            {/* Left Panel */}
             <div className={styles.authPanel}>
-                <div className={styles.authBranding}>
-                    <div className={styles.authLogo}>
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <span className={styles.authLogoText}>Decisera</span>
+                <div className={styles.panelContent}>
+                    <Link to="/" className={styles.panelLogo}>
+                        <div className={styles.logoMark}><Sparkles size={16} /></div>
+                        <span className={styles.logoText}>Decisera</span>
+                    </Link>
+
+                    <div className={styles.panelHero}>
+                        <h1 className={styles.panelTitle}>Start making data-driven decisions today</h1>
+                        <p className={styles.panelDesc}>
+                            Create your account and start exploring your data with AI-powered insights in minutes.
+                        </p>
                     </div>
 
-                    <h1 className={styles.authTagline}>
-                        Start your data-driven journey today
-                    </h1>
-                    <p className={styles.authDescription}>
-                        Join thousands of data professionals using AI to make better decisions faster.
-                        No credit card required.
-                    </p>
-                </div>
-
-                <div className={styles.authFeatures}>
-                    <div className={styles.authFeature}>
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Free forever for individual use</span>
-                    </div>
-                    <div className={styles.authFeature}>
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>No credit card required</span>
-                    </div>
-                    <div className={styles.authFeature}>
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Enterprise-grade security</span>
-                    </div>
-                    <div className={styles.authFeature}>
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Setup in under 2 minutes</span>
+                    <div className={styles.panelStats}>
+                        <div className={styles.panelStat}>
+                            <span className={styles.statValue}>Free</span>
+                            <span className={styles.statLabel}>To Get Started</span>
+                        </div>
+                        <div className={styles.panelStatDivider} />
+                        <div className={styles.panelStat}>
+                            <span className={styles.statValue}>No Card</span>
+                            <span className={styles.statLabel}>Required</span>
+                        </div>
+                        <div className={styles.panelStatDivider} />
+                        <div className={styles.panelStat}>
+                            <span className={styles.statValue}>Instant</span>
+                            <span className={styles.statLabel}>Setup</span>
+                        </div>
                     </div>
                 </div>
+                <div className={styles.panelPattern} />
             </div>
 
             {/* Right Panel - Form */}
             <div className={styles.authForm}>
-                <div className={styles.authFormContent}>
+                <div className={styles.formContainer}>
                     <Link to="/" className={styles.backLink}>
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
+                        <ArrowLeft size={14} />
                         Back to Home
                     </Link>
 
                     <div className={styles.formHeader}>
                         <h2 className={styles.formTitle}>Create your account</h2>
-                        <p className={styles.formSubtitle}>
-                            Get started with AI-powered data analysis in minutes
-                        </p>
+                        <p className={styles.formSubtitle}>Fill in your details to get started</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
                         {errors.submit && (
-                            <div className={styles.error}>
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {errors.submit}
-                            </div>
+                            <div className={styles.errorBanner}>{errors.submit}</div>
                         )}
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} htmlFor="username">
-                                Username
-                            </label>
+                        <div className={styles.field}>
+                            <label className={styles.label} htmlFor="reg-username">Username</label>
                             <input
-                                id="username"
+                                id="reg-username"
                                 type="text"
-                                className={styles.input}
+                                className={`${styles.input} ${errors.username ? styles.inputError : ''}`}
                                 placeholder="Choose a username"
                                 value={formData.username}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, username: e.target.value });
-                                    if (errors.username) {
-                                        const newErrors = { ...errors };
-                                        delete newErrors.username;
-                                        setErrors(newErrors);
-                                    }
-                                }}
+                                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                 required
                                 disabled={loading}
                                 autoComplete="username"
                             />
-                            {errors.username && (
-                                <span className={styles.error}>{errors.username}</span>
-                            )}
+                            {errors.username && <span className={styles.errorBanner} style={{ padding: '6px 10px' }}>{errors.username}</span>}
                         </div>
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} htmlFor="email">
-                                Email Address
-                            </label>
+                        <div className={styles.field}>
+                            <label className={styles.label} htmlFor="reg-email">Email</label>
                             <input
-                                id="email"
+                                id="reg-email"
                                 type="email"
-                                className={styles.input}
-                                placeholder="your.email@company.com"
+                                className={`${styles.input} ${errors.email ? styles.inputError : ''}`}
+                                placeholder="your@email.com"
                                 value={formData.email}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, email: e.target.value });
-                                    if (errors.email) {
-                                        const newErrors = { ...errors };
-                                        delete newErrors.email;
-                                        setErrors(newErrors);
-                                    }
-                                }}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 required
                                 disabled={loading}
                                 autoComplete="email"
                             />
-                            {errors.email && (
-                                <span className={styles.error}>{errors.email}</span>
-                            )}
+                            {errors.email && <span className={styles.errorBanner} style={{ padding: '6px 10px' }}>{errors.email}</span>}
                         </div>
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} htmlFor="password">
-                                Password
-                            </label>
-                            <span className={styles.passwordHint}>
-                                Must be at least 8 characters with uppercase, lowercase, number, and special character
-                            </span>
+                        <div className={styles.field}>
+                            <label className={styles.label} htmlFor="reg-password">Password</label>
                             <input
-                                id="password"
+                                id="reg-password"
                                 type="password"
-                                className={styles.input}
+                                className={`${styles.input} ${errors.password ? styles.inputError : ''}`}
                                 placeholder="Create a strong password"
                                 value={formData.password}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, password: e.target.value });
-                                    if (errors.password) {
-                                        const newErrors = { ...errors };
-                                        delete newErrors.password;
-                                        setErrors(newErrors);
-                                    }
-                                }}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 required
                                 disabled={loading}
                                 autoComplete="new-password"
                             />
+
+                            {/* Strength Bar */}
                             {formData.password && (
-                                <>
-                                    <div className={styles.passwordStrength}>
-                                        <div className={`${styles.strengthBar} ${passwordStrength >= 1 ? styles.weak : ''}`}></div>
-                                        <div className={`${styles.strengthBar} ${passwordStrength >= 2 ? styles.medium : ''}`}></div>
-                                        <div className={`${styles.strengthBar} ${passwordStrength >= 3 ? styles.strong : ''}`}></div>
-                                    </div>
-                                    <div className={styles.passwordRequirements}>
-                                        <div className={`${styles.requirementItem} ${pwdRules.minLength ? styles.met : styles.unmet}`}>
-                                            <span className={styles.requirementIcon}>{pwdRules.minLength ? '✓' : '○'}</span>
-                                            <span>At least 8 characters</span>
-                                        </div>
-                                        <div className={`${styles.requirementItem} ${pwdRules.hasUpper ? styles.met : styles.unmet}`}>
-                                            <span className={styles.requirementIcon}>{pwdRules.hasUpper ? '✓' : '○'}</span>
-                                            <span>At least one uppercase letter (A-Z)</span>
-                                        </div>
-                                        <div className={`${styles.requirementItem} ${pwdRules.hasLower ? styles.met : styles.unmet}`}>
-                                            <span className={styles.requirementIcon}>{pwdRules.hasLower ? '✓' : '○'}</span>
-                                            <span>At least one lowercase letter (a-z)</span>
-                                        </div>
-                                        <div className={`${styles.requirementItem} ${pwdRules.hasDigit ? styles.met : styles.unmet}`}>
-                                            <span className={styles.requirementIcon}>{pwdRules.hasDigit ? '✓' : '○'}</span>
-                                            <span>At least one digit (0-9)</span>
-                                        </div>
-                                        <div className={`${styles.requirementItem} ${pwdRules.hasSpecial ? styles.met : styles.unmet}`}>
-                                            <span className={styles.requirementIcon}>{pwdRules.hasSpecial ? '✓' : '○'}</span>
-                                            <span>At least one special character (!@#$%^&*...)</span>
-                                        </div>
-                                    </div>
-                                </>
+                                <div className={styles.strengthBar}>
+                                    <div className={`${styles.strengthSegment} ${passwordStrength >= 1 ? styles.strengthWeak : ''}`} />
+                                    <div className={`${styles.strengthSegment} ${passwordStrength >= 2 ? styles.strengthMedium : ''}`} />
+                                    <div className={`${styles.strengthSegment} ${passwordStrength >= 3 ? styles.strengthStrong : ''}`} />
+                                </div>
                             )}
-                            {errors.password && (
-                                <span className={styles.error}>{errors.password}</span>
-                            )}
+
+                            {/* Password Rules — Always visible */}
+                            <div className={styles.passwordRules}>
+                                {ruleItems.map((rule, i) => (
+                                    <div key={i} className={`${styles.rule} ${rule.met ? styles.ruleMet : ''}`}>
+                                        {rule.met
+                                            ? <Check size={12} />
+                                            : <Circle size={12} />
+                                        }
+                                        {rule.label}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} htmlFor="confirmPassword">
-                                Confirm Password
-                            </label>
+                        <div className={styles.field}>
+                            <label className={styles.label} htmlFor="reg-confirm">Confirm Password</label>
                             <input
-                                id="confirmPassword"
+                                id="reg-confirm"
                                 type="password"
-                                className={styles.input}
-                                placeholder="Re-enter your password"
+                                className={`${styles.input} ${errors.confirmPassword ? styles.inputError : ''}`}
+                                placeholder="Confirm your password"
                                 value={formData.confirmPassword}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, confirmPassword: e.target.value });
-                                    if (errors.confirmPassword) {
-                                        const newErrors = { ...errors };
-                                        delete newErrors.confirmPassword;
-                                        setErrors(newErrors);
-                                    }
-                                }}
+                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                                 required
                                 disabled={loading}
                                 autoComplete="new-password"
                             />
-                            {errors.confirmPassword && (
-                                <span className={styles.error}>{errors.confirmPassword}</span>
-                            )}
+                            {errors.confirmPassword && <span className={styles.errorBanner} style={{ padding: '6px 10px' }}>{errors.confirmPassword}</span>}
                         </div>
 
-                        <button
-                            type="submit"
-                            className={styles.submitButton}
-                            disabled={loading}
-                        >
+                        <button type="submit" className={styles.submitBtn} disabled={loading}>
                             {loading ? (
                                 <>
-                                    <svg className="animate-spin" fill="none" viewBox="0 0 24 24" width="20" height="20">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
+                                    <Loader2 size={16} className={styles.spinIcon} />
                                     Creating account...
                                 </>
-                            ) : (
-                                'Create Account'
-                            )}
+                            ) : 'Create Account'}
                         </button>
                     </form>
 
-                    <div className={styles.formFooter}>
-                        Already have an account?{' '}
-                        <Link to="/login">Sign in</Link>
-                    </div>
+                    <p className={styles.formFooter}>
+                        Already have an account? <Link to="/login">Sign in</Link>
+                    </p>
                 </div>
             </div>
         </div>

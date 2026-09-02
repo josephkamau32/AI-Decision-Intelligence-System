@@ -1,184 +1,200 @@
 import React, { useEffect, useState } from 'react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import SkeletonLoader from '../components/ui/SkeletonLoader';
+import { useNavigate } from 'react-router-dom';
+import { getDatasets } from '../services/datasetService';
+import { getModels, ModelSummary } from '../services/modelService';
+import { useToast } from '../context/ToastProvider';
+import { Database, Cpu, Zap, Target, Upload, ArrowRight } from 'lucide-react';
 import UploadDataset from '../components/UploadDataset';
+import Card from '../components/ui/Card';
+import SkeletonLoader from '../components/ui/SkeletonLoader';
 import styles from './Dashboard.module.css';
 
-interface Stats {
-  datasets: number;
-  models: number;
-  predictions: number;
-  accuracy: number;
+interface DashboardStats {
+    datasets: number;
+    models: number;
+    predictions: string;
+    topAccuracy: string;
 }
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState<DashboardStats>({ datasets: 0, models: 0, predictions: '—', topAccuracy: '—' });
+    const [datasets, setDatasets] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { addToast } = useToast();
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    // Simulate loading stats
-    setTimeout(() => {
-      setStats({
-        datasets: 12,
-        models: 8,
-        predictions: 1547,
-        accuracy: 94.5
-      });
-      setLoading(false);
-    }, 1000);
-  }, []);
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [dsData, modelData] = await Promise.allSettled([
+                getDatasets(),
+                getModels()
+            ]);
 
-  const statCards = [
-    {
-      label: 'Datasets',
-      value: stats?.datasets || 0,
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-        </svg>
-      ),
-      color: 'blue'
-    },
-    {
-      label: 'Models',
-      value: stats?.models || 0,
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      color: 'purple'
-    },
-    {
-      label: 'Predictions',
-      value: stats?.predictions || 0,
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      color: 'green'
-    },
-    {
-      label: 'Avg Accuracy',
-      value: `${stats?.accuracy || 0}%`,
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      color: 'pink'
-    }
-  ];
+            const rawDs = dsData.status === 'fulfilled' ? dsData.value : [];
+            const dsList = Array.isArray(rawDs) ? rawDs : (rawDs as any)?.data || [];
+            const rawModels = modelData.status === 'fulfilled' ? modelData.value : [];
+            const modelList: ModelSummary[] = Array.isArray(rawModels) ? rawModels : (rawModels as any)?.models || [];
 
-  return (
-    <div className={styles.dashboard}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Dashboard</h1>
-          <p className={styles.subtitle}>Welcome to Decisera</p>
+            setDatasets(dsList);
+
+            // Calculate top accuracy from model metrics
+            let topAcc = 0;
+            modelList.forEach((m) => {
+                if (m.metrics) {
+                    const acc = m.metrics.accuracy || m.metrics.r2_score || 0;
+                    if (acc > topAcc) topAcc = acc;
+                }
+            });
+
+            setStats({
+                datasets: dsList.length,
+                models: modelList.length,
+                predictions: modelList.length > 0 ? 'Available' : '—',
+                topAccuracy: topAcc > 0 ? `${(topAcc * 100).toFixed(1)}%` : '—'
+            });
+        } catch (error) {
+            addToast('Failed to load dashboard data', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const statCards = [
+        { icon: <Database size={18} />, label: 'Datasets', value: stats.datasets.toString(), color: 'indigo' },
+        { icon: <Cpu size={18} />, label: 'Models', value: stats.models.toString(), color: 'cyan' },
+        { icon: <Zap size={18} />, label: 'Predictions', value: stats.predictions, color: 'amber' },
+        { icon: <Target size={18} />, label: 'Top Accuracy', value: stats.topAccuracy, color: 'emerald' },
+    ];
+
+    const pipelineSteps = [
+        { num: 1, label: 'Upload Dataset', desc: 'CSV, Excel, or JSON', path: '/dataset-overview', done: stats.datasets > 0 },
+        { num: 2, label: 'Train Model', desc: 'AutoML picks the best', path: '/model-performance', done: stats.models > 0 },
+        { num: 3, label: 'View Insights', desc: 'Charts & explanations', path: '/visual-insights', done: stats.models > 0 },
+    ];
+
+    const formatDate = (dateStr: string) => {
+        try {
+            return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch {
+            return '—';
+        }
+    };
+
+    return (
+        <div className={styles.container}>
+            {/* Page Header */}
+            <div className={styles.pageHeader}>
+                <div>
+                    <h1 className={styles.pageTitle}>Dashboard</h1>
+                    <p className={styles.pageSubtitle}>
+                        {stats.datasets > 0
+                            ? `${stats.datasets} dataset${stats.datasets !== 1 ? 's' : ''} · ${stats.models} model${stats.models !== 1 ? 's' : ''} active`
+                            : 'Upload your first dataset to get started'
+                        }
+                    </p>
+                </div>
+            </div>
+
+            {/* Stat Cards */}
+            <div className={styles.statsGrid}>
+                {loading ? (
+                    [1, 2, 3, 4].map((i) => (
+                        <Card key={i}>
+                            <SkeletonLoader variant="rect" height={70} />
+                        </Card>
+                    ))
+                ) : (
+                    statCards.map((stat, i) => (
+                        <Card key={i} className={styles.statCard}>
+                            <div className={`${styles.statIcon} ${styles[`statIcon_${stat.color}`]}`}>
+                                {stat.icon}
+                            </div>
+                            <div className={styles.statContent}>
+                                <div className={styles.statValue}>{stat.value}</div>
+                                <div className={styles.statLabel}>{stat.label}</div>
+                            </div>
+                        </Card>
+                    ))
+                )}
+            </div>
+
+            {/* Main Content Grid */}
+            <div className={styles.contentGrid}>
+                {/* Upload Zone */}
+                <Card className={styles.uploadCard}>
+                    <div className={styles.cardHeader}>
+                        <Upload size={16} className={styles.cardHeaderIcon} />
+                        <h2 className={styles.cardTitle}>Upload Dataset</h2>
+                    </div>
+                    <UploadDataset />
+                </Card>
+
+                {/* Getting Started Pipeline */}
+                <Card className={styles.pipelineCard}>
+                    <div className={styles.cardHeader}>
+                        <ArrowRight size={16} className={styles.cardHeaderIcon} />
+                        <h2 className={styles.cardTitle}>Getting Started</h2>
+                    </div>
+                    <div className={styles.pipeline}>
+                        {pipelineSteps.map((step, i) => (
+                            <button
+                                key={i}
+                                className={`${styles.pipelineStep} ${step.done ? styles.pipelineStepDone : ''}`}
+                                onClick={() => navigate(step.path)}
+                            >
+                                <div className={styles.pipelineNum}>{step.done ? '✓' : step.num}</div>
+                                <div className={styles.pipelineInfo}>
+                                    <div className={styles.pipelineLabel}>{step.label}</div>
+                                    <div className={styles.pipelineDesc}>{step.desc}</div>
+                                </div>
+                                {i < pipelineSteps.length - 1 && <div className={styles.pipelineConnector} />}
+                            </button>
+                        ))}
+                    </div>
+                </Card>
+            </div>
+
+            {/* Recent Datasets Table */}
+            {datasets.length > 0 && (
+                <Card className={styles.tableCard}>
+                    <div className={styles.cardHeader}>
+                        <Database size={16} className={styles.cardHeaderIcon} />
+                        <h2 className={styles.cardTitle}>Recent Datasets</h2>
+                        <button className={styles.viewAllBtn} onClick={() => navigate('/dataset-overview')}>
+                            View All
+                        </button>
+                    </div>
+                    <div className={styles.tableWrapper}>
+                        <table className={styles.table}>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Rows</th>
+                                    <th>Columns</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {datasets.slice(0, 5).map((ds, i) => (
+                                    <tr key={ds.id || i} onClick={() => navigate('/dataset-overview')} className={styles.tableRow}>
+                                        <td className={styles.tdName}>{ds.name || 'Unnamed'}</td>
+                                        <td>{ds.rows?.toLocaleString() || '—'}</td>
+                                        <td>{ds.columns || '—'}</td>
+                                        <td>{formatDate(ds.created)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
         </div>
-      </div>
-
-      <div className={styles.statsGrid}>
-        {loading ? (
-          <>
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} variant="glass">
-                <SkeletonLoader variant="rect" height={120} />
-              </Card>
-            ))}
-          </>
-        ) : (
-          statCards.map((stat, index) => (
-            <Card key={index} variant="glass" hoverable className={styles.statCard}>
-              <div className={`${styles.statIcon} ${styles[stat.color]}`}>
-                {stat.icon}
-              </div>
-              <div className={styles.statContent}>
-                <div className={styles.statLabel}>{stat.label}</div>
-                <div className={styles.statValue}>{stat.value}</div>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
-
-      <div className={styles.grid}>
-        <Card className={styles.uploadCard}>
-          <h2 className={styles.sectionTitle}>Upload Dataset</h2>
-          <UploadDataset />
-        </Card>
-
-        <Card variant="glass" className={styles.quickActions}>
-          <h2 className={styles.sectionTitle}>Quick Actions</h2>
-          <div className={styles.actionButtons}>
-            <Button
-              variant="primary"
-              fullWidth
-              onClick={() => window.location.href = '/model-performance'}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Train New Model
-            </Button>
-            <Button
-              variant="outline"
-              fullWidth
-              onClick={() => window.location.href = '/model-performance'}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              View Models
-            </Button>
-            <Button
-              variant="outline"
-              fullWidth
-              onClick={() => window.location.href = '/copilot'}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              Ask AI Copilot
-            </Button>
-            <Button
-              variant="outline"
-              fullWidth
-              onClick={() => window.location.href = '/dataset-overview'}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-              </svg>
-              View Datasets
-            </Button>
-            <Button
-              variant="outline"
-              fullWidth
-              onClick={() => window.location.href = '/feature-importance'}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              Feature Importance
-            </Button>
-            <Button
-              variant="outline"
-              fullWidth
-              onClick={() => window.location.href = '/visual-insights'}
-            >
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '20px', height: '20px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-              </svg>
-              Visual Insights
-            </Button>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Dashboard;

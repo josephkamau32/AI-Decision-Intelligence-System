@@ -37,14 +37,10 @@ const Button: React.FC<ButtonProps> = ({
             disabled={disabled || loading}
             {...props}
         >
-            {loading && (
-                <svg className={styles.spinner} viewBox="0 0 24 24">
-                    <circle className={styles.spinnerCircle} cx="12" cy="12" r="10" />
-                </svg>
-            )}
-            {!loading && leftIcon && <span className={styles.iconLeft}>{leftIcon}</span>}
-            <span className={styles.content}>{children}</span>
-            {!loading && rightIcon && <span className={styles.iconRight}>{rightIcon}</span>}
+            {loading && <span className={styles.loadingSpinner} />}
+            {!loading && leftIcon && <span className={styles.iconSlot}>{leftIcon}</span>}
+            {children}
+            {!loading && rightIcon && <span className={styles.iconSlot}>{rightIcon}</span>}
         </button>
     );
 };

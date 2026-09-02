@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeProvider';
+import { Sun, Moon, CheckCircle2 } from 'lucide-react';
 import styles from './Layout.module.css';
 import Sidebar from './Sidebar';
 
@@ -7,21 +9,56 @@ interface LayoutProps {
     children: React.ReactNode;
 }
 
+const getBreadcrumb = (pathname: string): { section: string; title: string } => {
+    switch (pathname) {
+        case '/dashboard':
+            return { section: 'Overview', title: 'Dashboard' };
+        case '/dataset-overview':
+            return { section: 'Data Management', title: 'Datasets' };
+        case '/model-performance':
+            return { section: 'Machine Learning', title: 'Model Performance' };
+        case '/feature-importance':
+            return { section: 'Explainability', title: 'Feature Importance' };
+        case '/visual-insights':
+            return { section: 'Analytics', title: 'Visual Insights' };
+        case '/copilot':
+            return { section: 'Intelligence', title: 'AI Copilot' };
+        default:
+            return { section: 'Decisera', title: 'Analytics' };
+    }
+};
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { theme, toggleTheme } = useTheme();
+    const [collapsed, setCollapsed] = useState(false);
+    const location = useLocation();
+    const breadcrumb = getBreadcrumb(location.pathname);
 
     return (
         <div className={styles.layout}>
-            <Sidebar />
+            <Sidebar
+                collapsed={collapsed}
+                onToggle={() => setCollapsed(!collapsed)}
+            />
 
-            <div className={styles.main}>
+            <div className={`${styles.main} ${collapsed ? styles.mainCollapsed : ''}`}>
                 <header className={styles.header}>
                     <div className={styles.headerContent}>
+                        {/* Dynamic Breadcrumbs */}
                         <div className={styles.breadcrumb}>
-                            {/* Breadcrumb will be added dynamically */}
+                            <span className={styles.breadcrumbSection}>{breadcrumb.section}</span>
+                            <span className={styles.breadcrumbDivider}>/</span>
+                            <span className={styles.breadcrumbTitle}>{breadcrumb.title}</span>
                         </div>
 
                         <div className={styles.headerActions}>
+                            {/* System Status Pill */}
+                            <div className={styles.statusPill}>
+                                <CheckCircle2 size={12} className={styles.statusIcon} />
+                                <span>Engine Active</span>
+                            </div>
+
+                            {/* Theme Toggle Button */}
                             <button
                                 className={styles.themeToggle}
                                 onClick={toggleTheme}
@@ -29,22 +66,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
                             >
                                 {theme === 'light' ? (
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                                    </svg>
+                                    <Moon size={15} />
                                 ) : (
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                                    </svg>
+                                    <Sun size={15} />
                                 )}
                             </button>
                         </div>
                     </div>
                 </header>
 
-                <div className={styles.content}>
+                <main className={styles.content}>
                     {children}
-                </div>
+                </main>
             </div>
         </div>
     );

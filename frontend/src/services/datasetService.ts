@@ -1,30 +1,27 @@
 import api from './api';
 
 export const uploadDataset = async (file: File): Promise<void> => {
-  console.log('uploadDataset called with file:', file);
-  console.log('File details:', { name: file.name, size: file.size, type: file.type });
-
-  // Remove file extension from name for backend validation
-  // Backend validator doesn't allow dots in dataset names
-  const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
-
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('name', nameWithoutExtension);
-  formData.append('description', '');
-
-  // Debug: Log FormData entries
-  console.log('FormData entries:');
-  Array.from(formData.entries()).forEach(([key, value]) => {
-    console.log(`  ${key}:`, value);
-  });
-
-  // Don't manually set Content-Type - let axios set it with the correct boundary
-  await api.post(`/api/v1/datasets/upload`, formData);
+    const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', nameWithoutExtension);
+    formData.append('description', '');
+    await api.post('/api/v1/datasets/upload', formData);
 };
 
 export const getDatasets = async (): Promise<any[]> => {
-  const response = await api.get(`/api/v1/datasets/`);
-  // Backend returns PaginatedResponse with 'data' field
-  return response.data.data || [];
+    const response = await api.get('/api/v1/datasets/');
+    if (Array.isArray(response.data)) return response.data;
+    if (response.data && Array.isArray(response.data.data)) return response.data.data;
+    if (response.data && Array.isArray(response.data.datasets)) return response.data.datasets;
+    return [];
+};
+
+export const getDatasetById = async (id: string): Promise<any> => {
+    const response = await api.get(`/api/v1/datasets/${id}`);
+    return response.data;
+};
+
+export const deleteDataset = async (id: string): Promise<void> => {
+    await api.delete(`/api/v1/datasets/${id}`);
 };

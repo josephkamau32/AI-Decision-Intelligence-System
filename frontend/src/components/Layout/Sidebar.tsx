@@ -1,172 +1,140 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import {
+    LayoutDashboard, Database, Cpu, BarChart3,
+    LineChart, MessageSquare, PanelLeftClose,
+    PanelLeft, LogOut, Sparkles
+} from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
     path: string;
-    label: string;
     icon: React.ReactNode;
+    label: string;
+    badge?: string;
 }
 
-const Sidebar: React.FC = () => {
-    const location = useLocation();
-    const navigate = useNavigate();
+interface SidebarProps {
+    collapsed: boolean;
+    onToggle: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     const { user, logout } = useAuth();
-    const [collapsed, setCollapsed] = useState(false);
+    const navigate = useNavigate();
+
+    const mainNavItems: NavItem[] = [
+        { path: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+        { path: '/dataset-overview', icon: <Database size={18} />, label: 'Datasets' },
+    ];
+
+    const analyticsNavItems: NavItem[] = [
+        { path: '/model-performance', icon: <Cpu size={18} />, label: 'Models' },
+        { path: '/feature-importance', icon: <BarChart3 size={18} />, label: 'Feature Importance' },
+        { path: '/visual-insights', icon: <LineChart size={18} />, label: 'Visual Insights' },
+    ];
+
+    const toolsNavItems: NavItem[] = [
+        { path: '/copilot', icon: <MessageSquare size={18} />, label: 'AI Copilot', badge: 'AI' },
+    ];
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
-    const navSections = [
-        {
-            title: 'Analytics',
-            items: [
-                {
-                    path: '/dashboard',
-                    label: 'Dashboard',
-                    icon: (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                    )
-                },
-                {
-                    path: '/dataset-overview',
-                    label: 'Datasets',
-                    icon: (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                        </svg>
-                    )
-                },
-                {
-                    path: '/visual-insights',
-                    label: 'Insights',
-                    icon: (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                        </svg>
-                    )
-                }
-            ]
-        },
-        {
-            title: 'Machine Learning',
-            items: [
-                {
-                    path: '/model-performance',
-                    label: 'Models',
-                    icon: (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                    )
-                },
-                {
-                    path: '/feature-importance',
-                    label: 'Features',
-                    icon: (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                        </svg>
-                    )
-                }
-            ]
-        },
-        {
-            title: 'AI Tools',
-            items: [
-                {
-                    path: '/copilot',
-                    label: 'AI Copilot',
-                    icon: (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                        </svg>
-                    )
-                }
-            ]
-        }
-    ];
+    const userInitials = user?.username
+        ? user.username.slice(0, 2).toUpperCase()
+        : 'U';
+
+    const renderNavItem = (item: NavItem) => (
+        <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+                `${styles.navItem} ${isActive ? styles.active : ''}`
+            }
+            title={collapsed ? item.label : undefined}
+        >
+            <span className={styles.navIcon}>{item.icon}</span>
+            <span className={styles.navLabel}>{item.label}</span>
+            {item.badge && <span className={styles.itemBadge}>{item.badge}</span>}
+        </NavLink>
+    );
 
     return (
         <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
+            {/* Header */}
             <div className={styles.header}>
                 <div className={styles.logo}>
                     <div className={styles.logoIcon}>
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
+                        <Sparkles size={14} className={styles.sparkleIcon} />
                     </div>
-                    {!collapsed && <span className={styles.logoText}>Decisera</span>}
+                    {!collapsed && (
+                        <div className={styles.brandGroup}>
+                            <span className={styles.logoText}>Decisera</span>
+                            <span className={styles.logoBadge}>Intelligence</span>
+                        </div>
+                    )}
                 </div>
                 <button
                     className={styles.collapseButton}
-                    onClick={() => setCollapsed(!collapsed)}
+                    onClick={onToggle}
                     aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
+                    {collapsed ? <PanelLeft size={14} /> : <PanelLeftClose size={14} />}
                 </button>
             </div>
 
+            {/* Navigation */}
             <nav className={styles.nav}>
-                {navSections.map((section, sectionIndex) => (
-                    <div key={sectionIndex} className={styles.navSection}>
-                        {!collapsed && (
-                            <div className={styles.sectionTitle}>{section.title}</div>
-                        )}
-                        {section.items.map((item) => {
-                            const isActive = location.pathname === item.path;
-                            return (
-                                <Link
-                                    key={item.path}
-                                    to={item.path}
-                                    className={`${styles.navItem} ${isActive ? styles.active : ''}`}
-                                    title={collapsed ? item.label : undefined}
-                                >
-                                    <span className={styles.navIcon}>{item.icon}</span>
-                                    {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
-                                    {isActive && <span className={styles.activeIndicator} />}
-                                </Link>
-                            );
-                        })}
-                    </div>
-                ))}
+                <div className={styles.navSection}>
+                    {!collapsed && <div className={styles.sectionTitle}>Overview</div>}
+                    {mainNavItems.map(renderNavItem)}
+                </div>
+
+                <div className={styles.navSection}>
+                    {!collapsed && <div className={styles.sectionTitle}>Analytics</div>}
+                    {analyticsNavItems.map(renderNavItem)}
+                </div>
+
+                <div className={styles.navSection}>
+                    {!collapsed && <div className={styles.sectionTitle}>Tools</div>}
+                    {toolsNavItems.map(renderNavItem)}
+                </div>
             </nav>
 
+            {/* Footer */}
             <div className={styles.footer}>
-                <div className={styles.footerContent}>
-                    {!collapsed && (
-                        <>
-                            <div className={styles.userInfo}>
-                                <div className={styles.avatar}>
-                                    <svg fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div className={styles.userDetails}>
-                                    <div className={styles.userName}>{user?.username || 'User'}</div>
-                                    <div className={styles.userRole}>{user?.role || 'user'}</div>
-                                </div>
+                {collapsed ? (
+                    <button
+                        className={styles.collapsedLogoutBtn}
+                        onClick={handleLogout}
+                        title="Sign out"
+                        aria-label="Sign out"
+                    >
+                        <LogOut size={16} />
+                    </button>
+                ) : (
+                    <div className={styles.footerContent}>
+                        <div className={styles.userInfo}>
+                            <div className={styles.avatar}>{userInitials}</div>
+                            <div className={styles.userDetails}>
+                                <div className={styles.userName}>{user?.username || 'User'}</div>
+                                <div className={styles.userStatus}>Active</div>
                             </div>
-                            <button
-                                onClick={handleLogout}
-                                className={styles.logoutButton}
-                                title="Logout"
-                            >
-                                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                </svg>
-                                <span>Logout</span>
-                            </button>
-                        </>
-                    )}
-                </div>
+                        </div>
+                        <button
+                            className={styles.logoutIconBtn}
+                            onClick={handleLogout}
+                            title="Sign out"
+                            aria-label="Sign out"
+                        >
+                            <LogOut size={14} />
+                        </button>
+                    </div>
+                )}
             </div>
         </aside>
     );

@@ -1,175 +1,253 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { getDatasets } from '../services/datasetService';
+import { getCorrelation, getTrend } from '../services/visualizationService';
+import { useToast } from '../context/ToastProvider';
+import { LineChart, Database } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import SkeletonLoader from '../components/ui/SkeletonLoader';
 import styles from './VisualInsights.module.css';
 
-type ChartType = 'overview' | 'trends' | 'distribution' | 'correlation';
+// Dynamic import for Plotly to avoid SSR issues
+let Plot: any = null;
+try {
+    Plot = require('react-plotly.js').default;
+} catch {
+    // Plotly not available
+}
+
+type TabKey = 'overview' | 'trends' | 'correlation';
 
 const VisualInsights: React.FC = () => {
-  const [activeChart, setActiveChart] = useState<ChartType>('overview');
+    const [datasets, setDatasets] = useState<any[]>([]);
+    const [selectedDatasetId, setSelectedDatasetId] = useState('');
+    const [activeTab, setActiveTab] = useState<TabKey>('overview');
+    const [loading, setLoading] = useState(true);
+    const [chartLoading, setChartLoading] = useState(false);
+    const [correlationData, setCorrelationData] = useState<any>(null);
+    const [trendData, setTrendData] = useState<any>(null);
+    const { addToast } = useToast();
 
-  const charts: { type: ChartType; label: string; icon: React.ReactNode }[] = [
-    {
-      type: 'overview',
-      label: 'Overview',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      )
-    },
-    {
-      type: 'trends',
-      label: 'Trends',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-        </svg>
-      )
-    },
-    {
-      type: 'distribution',
-      label: 'Distribution',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      )
-    },
-    {
-      type: 'correlation',
-      label: 'Correlation',
-      icon: (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-        </svg>
-      )
-    }
-  ];
+    useEffect(() => {
+        const fetchDatasets = async () => {
+            try {
+                const data = await getDatasets();
+                const list = Array.isArray(data) ? data : (data as any)?.data || [];
+                setDatasets(list);
+                if (list.length > 0) setSelectedDatasetId(list[0].id);
+            } catch {
+                addToast('Failed to load datasets', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDatasets();
+    }, []);
 
-  const renderChartPlaceholder = () => {
+    const fetchChartData = useCallback(async () => {
+        if (!selectedDatasetId) return;
+        setChartLoading(true);
+        try {
+            if (activeTab === 'correlation') {
+                const data = await getCorrelation(selectedDatasetId);
+                setCorrelationData(data);
+            } else if (activeTab === 'trends') {
+                const data = await getTrend(selectedDatasetId);
+                setTrendData(data);
+            }
+        } catch {
+            // Silently handle — show empty state
+        } finally {
+            setChartLoading(false);
+        }
+    }, [selectedDatasetId, activeTab]);
+
+    useEffect(() => {
+        fetchChartData();
+    }, [fetchChartData]);
+
+    const selectedDs = Array.isArray(datasets) ? datasets.find((d) => d.id === selectedDatasetId) : undefined;
+
+    const tabs: { key: TabKey; label: string }[] = [
+        { key: 'overview', label: 'Overview' },
+        { key: 'trends', label: 'Trends' },
+        { key: 'correlation', label: 'Correlation' },
+    ];
+
+    const chartColors = [
+        'var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)',
+        'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)'
+    ];
+
+    const plotLayout: any = {
+        autosize: true,
+        margin: { l: 50, r: 20, t: 30, b: 40 },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { family: 'Inter, sans-serif', size: 12, color: '#94a3b8' },
+        xaxis: { gridcolor: 'rgba(148, 163, 184, 0.1)', zerolinecolor: 'rgba(148, 163, 184, 0.15)' },
+        yaxis: { gridcolor: 'rgba(148, 163, 184, 0.1)', zerolinecolor: 'rgba(148, 163, 184, 0.15)' },
+    };
+
+    const renderOverview = () => {
+        if (!selectedDs) return null;
+        const stats = [
+            { label: 'Rows', value: selectedDs.rows?.toLocaleString() || '0' },
+            { label: 'Columns', value: selectedDs.columns || '0' },
+            { label: 'Name', value: selectedDs.name || 'Unnamed' },
+        ];
+
+        return (
+            <div className={styles.overviewGrid}>
+                {stats.map((s, i) => (
+                    <div key={i} className={styles.overviewStat}>
+                        <div className={styles.overviewValue}>{s.value}</div>
+                        <div className={styles.overviewLabel}>{s.label}</div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    const renderTrends = () => {
+        if (!trendData || !Plot) {
+            return (
+                <div className={styles.chartEmpty}>
+                    <p>No trend data available for this dataset</p>
+                </div>
+            );
+        }
+
+        const traces = trendData.trends
+            ? trendData.trends.map((t: any, i: number) => ({
+                x: t.x || t.index,
+                y: t.y || t.values,
+                type: 'scatter',
+                mode: 'lines',
+                name: t.name || `Series ${i + 1}`,
+                line: { color: chartColors[i % chartColors.length], width: 2 },
+            }))
+            : [{
+                y: trendData.values || trendData.y || [],
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: chartColors[0], width: 2 },
+            }];
+
+        return (
+            <Plot
+                data={traces}
+                layout={{ ...plotLayout, title: '' }}
+                config={{ displayModeBar: false, responsive: true }}
+                style={{ width: '100%', height: '360px' }}
+                useResizeHandler
+            />
+        );
+    };
+
+    const renderCorrelation = () => {
+        if (!correlationData || !Plot) {
+            return (
+                <div className={styles.chartEmpty}>
+                    <p>No correlation data available for this dataset</p>
+                </div>
+            );
+        }
+
+        const matrix = correlationData.matrix || correlationData;
+        const labels = correlationData.columns || correlationData.labels || [];
+
+        return (
+            <Plot
+                data={[{
+                    z: matrix,
+                    x: labels,
+                    y: labels,
+                    type: 'heatmap',
+                    colorscale: [
+                        [0, '#312e81'], [0.25, '#4338ca'], [0.5, '#f8fafc'],
+                        [0.75, '#0e7490'], [1, '#164e63']
+                    ],
+                    zmin: -1,
+                    zmax: 1,
+                }]}
+                layout={{ ...plotLayout, title: '' }}
+                config={{ displayModeBar: false, responsive: true }}
+                style={{ width: '100%', height: '400px' }}
+                useResizeHandler
+            />
+        );
+    };
+
     return (
-      <div className={styles.chartPlaceholder}>
-        <div className={styles.placeholderIcon}>
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-          </svg>
+        <div className={styles.container}>
+            <div className={styles.pageHeader}>
+                <div>
+                    <h1 className={styles.pageTitle}>Visual Insights</h1>
+                    <p className={styles.pageSubtitle}>Explore your data through interactive visualizations</p>
+                </div>
+            </div>
+
+            {/* Dataset Selector */}
+            <div className={styles.controls}>
+                <div className={styles.selectField}>
+                    <label className={styles.selectLabel}>Dataset</label>
+                    <select
+                        className={styles.selectInput}
+                        value={selectedDatasetId}
+                        onChange={(e) => setSelectedDatasetId(e.target.value)}
+                        disabled={loading}
+                    >
+                        <option value="">Select a dataset...</option>
+                        {Array.isArray(datasets) && datasets.map((ds) => (
+                            <option key={ds.id} value={ds.id}>
+                                {ds.name} ({ds.rows?.toLocaleString()} rows)
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {loading ? (
+                <Card><SkeletonLoader variant="rect" height={400} /></Card>
+            ) : !selectedDatasetId ? (
+                <Card className={styles.emptyCard}>
+                    <div className={styles.empty}>
+                        <LineChart size={40} className={styles.emptyIcon} />
+                        <h3 className={styles.emptyTitle}>Select a dataset</h3>
+                        <p className={styles.emptyDesc}>Choose a dataset to explore visualizations</p>
+                    </div>
+                </Card>
+            ) : (
+                <>
+                    {/* Tab Controls */}
+                    <div className={styles.tabBar}>
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.key}
+                                className={`${styles.tab} ${activeTab === tab.key ? styles.tabActive : ''}`}
+                                onClick={() => setActiveTab(tab.key)}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Chart Area */}
+                    <Card className={styles.chartCard}>
+                        {chartLoading ? (
+                            <SkeletonLoader variant="rect" height={360} />
+                        ) : (
+                            <>
+                                {activeTab === 'overview' && renderOverview()}
+                                {activeTab === 'trends' && renderTrends()}
+                                {activeTab === 'correlation' && renderCorrelation()}
+                            </>
+                        )}
+                    </Card>
+                </>
+            )}
         </div>
-        <h3 className={styles.placeholderTitle}>{activeChart.charAt(0).toUpperCase() + activeChart.slice(1)} Chart</h3>
-        <p className={styles.placeholderText}>
-          Interactive {activeChart} visualization would appear here. This could include:
-        </p>
-        <ul className={styles.placeholderList}>
-          {activeChart === 'overview' && (
-            <>
-              <li>Key metrics dashboard</li>
-              <li>Summary statistics</li>
-              <li>Quick insights</li>
-            </>
-          )}
-          {activeChart === 'trends' && (
-            <>
-              <li>Time series analysis</li>
-              <li>Trend lines and forecasts</li>
-              <li>Seasonal patterns</li>
-            </>
-          )}
-          {activeChart === 'distribution' && (
-            <>
-              <li>Histograms and density plots</li>
-              <li>Box plots</li>
-              <li>Statistical summaries</li>
-            </>
-          )}
-          {activeChart === 'correlation' && (
-            <>
-              <li>Correlation heatmaps</li>
-              <li>Scatter plot matrices</li>
-              <li>Relationship insights</li>
-            </>
-          )}
-        </ul>
-      </div>
     );
-  };
-
-  return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Visual Insights</h1>
-          <p className={styles.subtitle}>Explore your data through interactive visualizations</p>
-        </div>
-      </div>
-
-      <div className={styles.controls}>
-        {charts.map((chart) => (
-          <Button
-            key={chart.type}
-            variant={activeChart === chart.type ? 'primary' : 'outline'}
-            onClick={() => setActiveChart(chart.type)}
-            leftIcon={chart.icon}
-          >
-            {chart.label}
-          </Button>
-        ))}
-      </div>
-
-      <Card variant="glass" className={styles.chartCard}>
-        {renderChartPlaceholder()}
-      </Card>
-
-      <div className={styles.grid}>
-        <Card variant="glass" className={styles.statCard}>
-          <div className={styles.statIcon}>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-          </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Total Records</span>
-            <span className={styles.statValue}>124,567</span>
-          </div>
-        </Card>
-
-        <Card variant="glass" className={styles.statCard}>
-          <div className={styles.statIcon}>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Features</span>
-            <span className={styles.statValue}>43</span>
-          </div>
-        </Card>
-
-        <Card variant="glass" className={styles.statCard}>
-          <div className={styles.statIcon}>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Last Updated</span>
-            <span className={styles.statValue}>2h ago</span>
-          </div>
-        </Card>
-
-        <Card variant="glass" className={styles.statCard}>
-          <div className={styles.statIcon}>
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Data Quality</span>
-            <span className={styles.statValue}>97%</span>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
 };
 
 export default VisualInsights;
