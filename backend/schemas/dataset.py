@@ -17,6 +17,7 @@ class DatasetInfo(BaseModel):
     size: int = 0
     rows: int = 0
     columns: int = 0
+    column_names: List[str] = Field(default_factory=list)
 
 
 class DatasetResponse(BaseModel):
@@ -25,6 +26,7 @@ class DatasetResponse(BaseModel):
     description: Optional[str] = None
     rows: int = 0
     columns: int = 0
+    column_names: List[str] = Field(default_factory=list)
     file_size: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

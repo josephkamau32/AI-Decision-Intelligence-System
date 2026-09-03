@@ -44,22 +44,28 @@ class VisualizationService:
         dataset = next(
             (d for d in dataset_service.datasets if d.id == dataset_id), None
         )
-        if not dataset or not dataset.profile:
+        if not dataset:
             return None
-        if dataset.profile.get("problem_type") != "time_series":
+        try:
+            df = DataIngestion.load_data(dataset.file_path)
+            profile = getattr(dataset, "profile", {}) or {}
+            target = profile.get("target_variable")
+            if not target or target not in df.columns:
+                num_cols = df.select_dtypes(include=[float, int]).columns
+                target = num_cols[0] if not num_cols.empty else None
+
+            # Find date col
+            date_col = None
+            for col in df.columns:
+                if pd.api.types.is_datetime64_any_dtype(df[col]) or "date" in str(col).lower() or "time" in str(col).lower():
+                    date_col = col
+                    break
+            if not date_col or not target:
+                return None
+            chart = TrendAnalysisChart(df, date_col, target)
+            return chart.generate_plot()
+        except Exception as e:
             return None
-        df = DataIngestion.load_data(dataset.file_path)
-        target = dataset.profile["target_variable"]
-        # Find date col
-        date_col = None
-        for col in df.columns:
-            if pd.api.types.is_datetime64_any_dtype(df[col]) or "date" in col.lower():
-                date_col = col
-                break
-        if not date_col:
-            return None
-        chart = TrendAnalysisChart(df, date_col, target)
-        return chart.generate_plot()
 
     def get_forecast_plot(
         self, model_id: str, dataset_id: str
@@ -68,21 +74,26 @@ class VisualizationService:
         dataset = next(
             (d for d in dataset_service.datasets if d.id == dataset_id), None
         )
-        if not model or not dataset or not dataset.profile:
+        if not model or not dataset:
             return None
-        if dataset.profile.get("problem_type") != "time_series":
+        try:
+            df = DataIngestion.load_data(dataset.file_path)
+            profile = getattr(dataset, "profile", {}) or {}
+            target = profile.get("target_variable")
+            if not target or target not in df.columns:
+                num_cols = df.select_dtypes(include=[float, int]).columns
+                target = num_cols[0] if not num_cols.empty else None
+            date_col = None
+            for col in df.columns:
+                if pd.api.types.is_datetime64_any_dtype(df[col]) or "date" in str(col).lower():
+                    date_col = col
+                    break
+            if not date_col or not target:
+                return None
+            plot = ForecastPlot(df, model, date_col, target)
+            return plot.generate_plot()
+        except Exception as e:
             return None
-        df = DataIngestion.load_data(dataset.file_path)
-        target = dataset.profile["target_variable"]
-        date_col = None
-        for col in df.columns:
-            if pd.api.types.is_datetime64_any_dtype(df[col]) or "date" in col.lower():
-                date_col = col
-                break
-        if not date_col:
-            return None
-        plot = ForecastPlot(df, model, date_col, target)
-        return plot.generate_plot()
 
     def get_interactive_filters(self, dataset_id: str) -> Optional[Dict[str, Any]]:
         dataset = next(

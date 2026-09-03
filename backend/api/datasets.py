@@ -109,6 +109,18 @@ async def list_datasets(
     )
 
 
+@router.get("/{dataset_id}/columns")
+async def get_dataset_columns(dataset_id: str):
+    """Get list of column names for a dataset."""
+    logger.info(f"Getting columns for dataset: {dataset_id}")
+    cols = dataset_service.get_dataset_columns(dataset_id)
+    if not cols:
+        dataset = dataset_service.get_dataset(dataset_id)
+        if not dataset:
+            raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
+    return {"columns": cols}
+
+
 @router.get("/{dataset_id}")
 async def get_dataset(dataset_id: str):
     """Get details of a specific dataset."""

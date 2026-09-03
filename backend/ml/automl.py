@@ -21,6 +21,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier, XGBRegressor
 import joblib
 import mlflow
@@ -74,38 +75,39 @@ class AutoML:
 
     def detect_task_type(self, X: pd.DataFrame, y: pd.Series) -> str:
         """Automatically detect if task is classification, regression, or time-series"""
-        # Detect date column if present
-        date_col = detect_time_series(X)
-        if date_col is None:
-            for col in X.columns:
-                if (
-                    pd.api.types.is_datetime64_any_dtype(X[col])
-                    or "date" in str(col).lower()
-                ):
-                    date_col = col
-                    break
+        # Detect date column if present (for datetime feature engineering)
+        date_col = None
+        for col in X.columns:
+            if (
+                pd.api.types.is_datetime64_any_dtype(X[col])
+                or "date" in str(col).lower()
+                or "time" in str(col).lower()
+            ):
+                date_col = col
+                break
         if date_col is not None:
             self.date_column = date_col
 
         if self.task_type != "auto":
             return self.task_type
 
-        # Check for time-series data
-        if self.date_column is not None:
-            logger.info(
-                f"Auto-detected task type: time_series (date column: {self.date_column})"
-            )
-            return "time_series"
+        # Target is non-numeric string/category/bool -> classification
+        if not pd.api.types.is_numeric_dtype(y):
+            logger.info("Auto-detected task type: classification (non-numeric target)")
+            return "classification"
 
-        # Check if target is numeric with many unique values
-        if y.dtype in ["int64", "float64"]:
-            unique_ratio = len(y.unique()) / len(y)
-            if unique_ratio > 0.05:  # More than 5% unique values suggests regression
-                logger.info("Auto-detected task type: regression")
-                return "regression"
+        # If numeric, check unique count
+        n_unique = y.nunique(dropna=True)
+        n_total = len(y.dropna())
 
-        logger.info("Auto-detected task type: classification")
-        return "classification"
+        # Binary or small discrete classes (<= 20 unique values or < 5% unique) -> classification
+        if n_unique <= 20 or (n_total > 0 and (n_unique / n_total) < 0.05):
+            logger.info(f"Auto-detected task type: classification ({n_unique} unique classes)")
+            return "classification"
+
+        # Continuous numeric target -> regression
+        logger.info("Auto-detected task type: regression (continuous numeric target)")
+        return "regression"
 
     def get_classification_models(self) -> Dict[str, Any]:
         """Return dictionary of classification models to train"""
@@ -258,6 +260,163 @@ class AutoML:
             "primary_score": metrics[primary_metric],
         }
 
+    def preprocess_fit(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
+        """
+        Production-grade AutoML preprocessing:
+        - Drops rows where target y is NaN
+        - Auto-detects task type
+        - Encodes target for classification with LabelEncoder
+        - Drops all-NaN columns, constants, and high-cardinality ID columns
+        - Extracts year, month, day, dayofweek from datetimes
+        - Imputes numerical NaNs with column median
+        - Imputes & encodes categorical columns
+        - Casts everything to float for universal model compatibility
+        """
+        # 1. Clean target
+        valid_mask = y.notna()
+        X = X.loc[valid_mask].copy()
+        y = y.loc[valid_mask].copy()
+
+        # 2. Detect task type
+        self.task_type = self.detect_task_type(X, y)
+
+        # 3. Process target
+        if self.task_type == "classification":
+            self.target_encoder = LabelEncoder()
+            y_clean = pd.Series(self.target_encoder.fit_transform(y.astype(str)), index=y.index, name=y.name)
+            self.classes_ = list(self.target_encoder.classes_)
+        else:
+            y_numeric = pd.to_numeric(y, errors="coerce")
+            valid_y = y_numeric.notna()
+            if valid_y.sum() == 0:
+                self.task_type = "classification"
+                self.target_encoder = LabelEncoder()
+                y_clean = pd.Series(self.target_encoder.fit_transform(y.astype(str)), index=y.index, name=y.name)
+                self.classes_ = list(self.target_encoder.classes_)
+            else:
+                X = X.loc[valid_y].copy()
+                y_clean = y_numeric.loc[valid_y].copy()
+                self.target_encoder = None
+                self.classes_ = None
+
+        # 4. Filter X columns
+        self.dropped_cols = []
+        clean_cols = []
+        n_rows = len(X)
+
+        for col in X.columns:
+            # Check all-NaN
+            if X[col].isna().all():
+                self.dropped_cols.append(col)
+                continue
+            # Check single constant value
+            if X[col].nunique(dropna=True) <= 1:
+                self.dropped_cols.append(col)
+                continue
+            # Check high-cardinality ID
+            col_str = str(col).lower()
+            if (col_str.endswith("_id") or col_str == "id") and X[col].nunique() > n_rows * 0.5:
+                self.dropped_cols.append(col)
+                continue
+            clean_cols.append(col)
+
+        X = X[clean_cols].copy()
+
+        # 5. Extract datetime features
+        self.datetime_cols = []
+        for col in list(X.columns):
+            if pd.api.types.is_datetime64_any_dtype(X[col]) or "date" in str(col).lower() or "time" in str(col).lower():
+                try:
+                    dt_series = pd.to_datetime(X[col], errors="coerce")
+                    if dt_series.notna().sum() > 0.5 * n_rows:
+                        median_year = dt_series.dt.year.median()
+                        X[f"{col}_year"] = dt_series.dt.year.fillna(median_year if pd.notna(median_year) else 2024)
+                        X[f"{col}_month"] = dt_series.dt.month.fillna(1)
+                        X[f"{col}_day"] = dt_series.dt.day.fillna(1)
+                        X[f"{col}_dayofweek"] = dt_series.dt.dayofweek.fillna(0)
+                        self.datetime_cols.append(col)
+                except Exception:
+                    pass
+
+        if self.datetime_cols:
+            X = X.drop(columns=self.datetime_cols, errors="ignore")
+
+        # 6. Process numerical columns
+        self.numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+        self.num_medians = {}
+        for col in self.numeric_cols:
+            median_val = X[col].median()
+            if pd.isna(median_val):
+                median_val = 0.0
+            self.num_medians[col] = float(median_val)
+            X[col] = X[col].fillna(median_val)
+
+        # 7. Process categorical columns
+        self.categorical_cols = [c for c in X.columns if c not in self.numeric_cols]
+        self.cat_modes = {}
+        self.cat_encoders = {}
+        for col in self.categorical_cols:
+            mode_val = X[col].mode()
+            fill_val = str(mode_val[0]) if not mode_val.empty else "missing"
+            self.cat_modes[col] = fill_val
+            filled_series = X[col].fillna(fill_val).astype(str)
+            le = LabelEncoder()
+            X[col] = le.fit_transform(filled_series)
+            self.cat_encoders[col] = le
+
+        # Ensure all columns are numeric float
+        X = X.astype(float)
+        self.feature_names = X.columns.tolist()
+        self.X_train_processed = X
+
+        return X, y_clean
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Transform new data using fitted preprocessing parameters"""
+        X = X.copy()
+        if hasattr(self, "dropped_cols") and self.dropped_cols:
+            X = X.drop(columns=[c for c in self.dropped_cols if c in X.columns], errors="ignore")
+
+        if hasattr(self, "datetime_cols") and self.datetime_cols:
+            for col in self.datetime_cols:
+                if col in X.columns:
+                    try:
+                        dt_series = pd.to_datetime(X[col], errors="coerce")
+                        X[f"{col}_year"] = dt_series.dt.year.fillna(2024)
+                        X[f"{col}_month"] = dt_series.dt.month.fillna(1)
+                        X[f"{col}_day"] = dt_series.dt.day.fillna(1)
+                        X[f"{col}_dayofweek"] = dt_series.dt.dayofweek.fillna(0)
+                    except Exception:
+                        pass
+            X = X.drop(columns=[c for c in self.datetime_cols if c in X.columns], errors="ignore")
+
+        if hasattr(self, "num_medians"):
+            for col, med in self.num_medians.items():
+                if col in X.columns:
+                    X[col] = pd.to_numeric(X[col], errors="coerce").fillna(med)
+                else:
+                    X[col] = med
+
+        if hasattr(self, "cat_encoders"):
+            for col, le in self.cat_encoders.items():
+                fill_val = self.cat_modes.get(col, "missing")
+                if col in X.columns:
+                    filled = X[col].fillna(fill_val).astype(str)
+                    classes_set = set(le.classes_)
+                    fallback = le.classes_[0] if len(le.classes_) > 0 else fill_val
+                    filled_mapped = filled.apply(lambda x: x if x in classes_set else fallback)
+                    X[col] = le.transform(filled_mapped)
+                else:
+                    X[col] = 0
+
+        if hasattr(self, "feature_names"):
+            for col in self.feature_names:
+                if col not in X.columns:
+                    X[col] = 0.0
+            X = X[self.feature_names]
+
+        return X.astype(float)
+
     def fit(
         self,
         X: pd.DataFrame,
@@ -269,26 +428,23 @@ class AutoML:
     ) -> Dict[str, Any]:
         """
         Train multiple models and select the best one
-
-        Args:
-            X: Feature dataset
-            y: Target variable
-            dataset_id: Optional dataset identifier
-            experiment_name: MLflow experiment name
-            use_cv: Whether to run 5-fold cross-validation during evaluation (default: True)
-            log_artifacts: Whether to log model artifacts to MLflow (default: True)
-
-        Returns:
-            Dictionary with best model info and all results
         """
-        # Detect task type
-        self.task_type = self.detect_task_type(X, y)
-
         # Handle time-series separately
         if self.task_type == "time_series":
             return self._fit_timeseries(
                 X, y, dataset_id, experiment_name, log_artifacts=log_artifacts
             )
+
+        # Preprocess features and target
+        X_clean, y_clean = self.preprocess_fit(X, y)
+        X = X_clean
+        y = y_clean
+
+        # Stratify safely
+        can_stratify = False
+        if self.task_type == "classification":
+            counts = pd.Series(y).value_counts()
+            can_stratify = len(counts) > 1 and counts.min() >= 2
 
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
@@ -296,7 +452,7 @@ class AutoML:
             y,
             test_size=self.test_size,
             random_state=self.random_state,
-            stratify=y if self.task_type == "classification" else None,
+            stratify=y if can_stratify else None,
         )
 
         logger.info(f"Training set: {X_train.shape}, Test set: {X_test.shape}")
@@ -308,82 +464,108 @@ class AutoML:
             models = self.get_regression_models()
 
         # Set up MLflow
-        mlflow.set_experiment(experiment_name)
+        try:
+            mlflow.set_experiment(experiment_name)
+        except Exception as e:
+            logger.warning(f"Could not set MLflow experiment: {e}")
 
         # Train all models
         results = {}
-        with mlflow.start_run(
-            run_name=f"AutoML_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        ):
-            # Log parameters
-            mlflow.log_param("task_type", self.task_type)
-            mlflow.log_param("test_size", self.test_size)
-            mlflow.log_param("n_features", X.shape[1])
-            mlflow.log_param("n_samples", X.shape[0])
-            if dataset_id:
-                mlflow.log_param("dataset_id", dataset_id)
+        try:
+            with mlflow.start_run(
+                run_name=f"AutoML_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            ):
+                # Log parameters
+                mlflow.log_param("task_type", self.task_type)
+                mlflow.log_param("test_size", self.test_size)
+                mlflow.log_param("n_features", X.shape[1])
+                mlflow.log_param("n_samples", X.shape[0])
+                if dataset_id:
+                    mlflow.log_param("dataset_id", dataset_id)
 
-            # Train each model
+                # Train each model
+                for model_name, model in models.items():
+                    try:
+                        with mlflow.start_run(
+                            run_name=model_name, nested=True
+                        ) as child_run:
+                            result = self.train_and_evaluate(
+                                X_train,
+                                X_test,
+                                y_train,
+                                y_test,
+                                model_name,
+                                model,
+                                use_cv=use_cv,
+                            )
+                            result["run_id"] = child_run.info.run_id
+                            results[model_name] = result
+
+                            # Log to MLflow
+                            mlflow.log_params(
+                                {f"{model_name}_param": str(model.get_params())}
+                            )
+                            mlflow.log_metrics(result["metrics"])
+                            if log_artifacts:
+                                try:
+                                    mlflow.sklearn.log_model(result["model"], model_name)
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Failed to log model artifact for {model_name}: {e}"
+                                    )
+
+                    except Exception as e:
+                        logger.error(f"Failed to train {model_name}: {e}")
+                        continue
+        except Exception as e:
+            logger.warning(f"MLflow run context error: {e}. Falling back to direct training.")
             for model_name, model in models.items():
                 try:
-                    with mlflow.start_run(
-                        run_name=model_name, nested=True
-                    ) as child_run:
-                        result = self.train_and_evaluate(
-                            X_train,
-                            X_test,
-                            y_train,
-                            y_test,
-                            model_name,
-                            model,
-                            use_cv=use_cv,
-                        )
-                        result["run_id"] = child_run.info.run_id
-                        results[model_name] = result
-
-                        # Log to MLflow
-                        mlflow.log_params(
-                            {f"{model_name}_param": str(model.get_params())}
-                        )
-                        mlflow.log_metrics(result["metrics"])
-                        if log_artifacts:
-                            try:
-                                mlflow.sklearn.log_model(result["model"], model_name)
-                            except Exception as e:
-                                logger.warning(
-                                    f"Failed to log model artifact for {model_name}: {e}"
-                                )
-
-                except Exception as e:
-                    logger.error(f"Failed to train {model_name}: {e}")
+                    result = self.train_and_evaluate(
+                        X_train,
+                        X_test,
+                        y_train,
+                        y_test,
+                        model_name,
+                        model,
+                        use_cv=use_cv,
+                    )
+                    results[model_name] = result
+                except Exception as model_err:
+                    logger.error(f"Failed to train {model_name} in fallback: {model_err}")
                     continue
 
-            # Select best model
-            if results:
-                self.best_model_name = max(
-                    results, key=lambda x: results[x]["primary_score"]
-                )
-                self.best_model = results[self.best_model_name]["model"]
-                self.best_score = results[self.best_model_name]["primary_score"]
-                best_run_id = results[self.best_model_name].get("run_id")
+        # Robust fallback if no advanced models succeeded
+        if not results:
+            logger.warning("No models succeeded in standard evaluation. Training robust fallback model...")
+            if self.task_type == "classification":
+                fallback_model = RandomForestClassifier(n_estimators=50, random_state=self.random_state)
+            else:
+                fallback_model = RandomForestRegressor(n_estimators=50, random_state=self.random_state)
+            fallback_model.fit(X_train, y_train)
+            y_pred = fallback_model.predict(X_test)
+            if self.task_type == "classification":
+                fallback_metrics = self.evaluate_classification(y_test, y_pred)
+                score = fallback_metrics["accuracy"]
+            else:
+                fallback_metrics = self.evaluate_regression(y_test, y_pred)
+                score = fallback_metrics["r2_score"]
+            results["RandomForest"] = {
+                "model": fallback_model,
+                "metrics": fallback_metrics,
+                "primary_score": score,
+            }
 
-                logger.info(
-                    f"Best model: {self.best_model_name} with score: {self.best_score:.4f}"
-                )
+        # Select best model
+        self.best_model_name = max(
+            results, key=lambda x: results[x]["primary_score"]
+        )
+        self.best_model = results[self.best_model_name]["model"]
+        self.best_score = results[self.best_model_name]["primary_score"]
 
-                # Log best model
-                mlflow.log_metric("best_score", self.best_score)
-                mlflow.log_param("best_model", self.best_model_name)
-
-                # Register best model from the child run where the artifact was logged
-                if best_run_id and log_artifacts:
-                    try:
-                        model_uri = f"runs:/{best_run_id}/{self.best_model_name}"
-                        mlflow.register_model(model_uri, f"best_{self.task_type}_model")
-                    except Exception as e:
-                        logger.warning(
-                            f"Could not register model in MLflow model registry: {e}"
-                        )
+        logger.info(
+            f"Best model: {self.best_model_name} with score: {self.best_score:.4f}"
+        )
 
         self.results = results
         self.models = {name: res["model"] for name, res in results.items()}
@@ -415,17 +597,25 @@ class AutoML:
         if self.best_model is None:
             raise ValueError("No model has been trained yet")
 
-        return self.best_model.predict(X)
+        X_trans = self.transform(X)
+        preds = self.best_model.predict(X_trans)
+        if getattr(self, "target_encoder", None) is not None:
+            try:
+                preds = self.target_encoder.inverse_transform(preds.astype(int))
+            except Exception:
+                pass
+        return preds
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Get prediction probabilities (classification only)"""
         if self.best_model is None:
             raise ValueError("No model has been trained yet")
 
-        if not hasattr(self.best_model, "predict_proba"):
-            raise ValueError("Model does not support probability predictions")
-
-        return self.best_model.predict_proba(X)
+        X_trans = self.transform(X)
+        if hasattr(self.best_model, "predict_proba"):
+            return self.best_model.predict_proba(X_trans)
+        else:
+            raise ValueError(f"{self.best_model_name} does not support predict_proba")
 
     def _fit_timeseries(
         self,
@@ -448,10 +638,28 @@ class AutoML:
         Returns:
             Dictionary with best model info and all results
         """
+        if not hasattr(self, "date_column") or self.date_column is None:
+            for col in X.columns:
+                if (
+                    pd.api.types.is_datetime64_any_dtype(X[col])
+                    or "date" in str(col).lower()
+                    or "time" in str(col).lower()
+                ):
+                    self.date_column = col
+                    break
+            if self.date_column is None:
+                for col in X.columns:
+                    try:
+                        pd.to_datetime(X[col])
+                        self.date_column = col
+                        break
+                    except Exception:
+                        pass
+
         if self.date_column is None:
             raise ValueError("No date column detected for time-series task")
 
-        logger.info(f"Training time-series models with {len(X)} samples")
+        logger.info(f"Training time-series models with {len(X)} samples using date_column={self.date_column}")
 
         # Prepare data for time-series
         df = X.copy()

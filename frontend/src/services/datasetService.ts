@@ -25,3 +25,12 @@ export const getDatasetById = async (id: string): Promise<any> => {
 export const deleteDataset = async (id: string): Promise<void> => {
     await api.delete(`/api/v1/datasets/${id}`);
 };
+
+export const getDatasetColumns = async (id: string): Promise<string[]> => {
+    try {
+        const response = await api.get(`/api/v1/datasets/${id}/columns`);
+        return response.data?.columns || [];
+    } catch {
+        return [];
+    }
+};

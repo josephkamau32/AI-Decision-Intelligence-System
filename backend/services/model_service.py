@@ -3,6 +3,7 @@ Enhanced Model Service with AutoML,  Inference, and Explainability integration
 """
 
 import uuid
+from datetime import datetime
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Optional
@@ -59,6 +60,7 @@ class ModelService:
         task_id: str,
         dataset_df: pd.DataFrame,
         target_column: str,
+        dataset_id: str = "",
         task_type: str = "auto",
         test_size: float = 0.2,
         experiment_name: str = "AutoML",
@@ -76,9 +78,11 @@ class ModelService:
                 "progress": 0,
             }
 
-            # Prepare data
-            X = dataset_df.drop(columns=[target_column])
-            y = dataset_df[target_column]
+            # Prepare data: drop any rows where target is missing
+            valid_mask = dataset_df[target_column].notna()
+            clean_df = dataset_df.loc[valid_mask].copy()
+            X = clean_df.drop(columns=[target_column])
+            y = clean_df[target_column]
 
             # Initialize AutoML
             automl = AutoML(task_type=task_type, test_size=test_size)
@@ -88,16 +92,23 @@ class ModelService:
             self.tasks[task_id]["message"] = "Training models..."
 
             # Train models
-            results = automl.fit(X, y, experiment_name=experiment_name)
+            results = automl.fit(X, y, dataset_id=dataset_id, experiment_name=experiment_name)
 
             # Update progress
             self.tasks[task_id]["progress"] = 80
             self.tasks[task_id]["message"] = "Generating explanations..."
 
-            # Create explainer
-            explainer = ModelExplainer(
-                automl.best_model, X_train=X.sample(min(100, len(X)))
-            )
+            # Create explainer using clean processed data
+            if hasattr(automl, "X_train_processed") and not automl.X_train_processed.empty:
+                X_sample = automl.X_train_processed.sample(min(100, len(automl.X_train_processed)))
+            else:
+                X_sample = X.sample(min(100, len(X)))
+
+            try:
+                explainer = ModelExplainer(automl.best_model, X_train=X_sample)
+            except Exception as explainer_err:
+                logger.warning(f"Could not initialize SHAP explainer: {explainer_err}")
+                explainer = None
 
             # Save model
             model_id = task_id
@@ -105,17 +116,23 @@ class ModelService:
             automl.save_model(str(model_path))
 
             # Store in memory
+            feature_names = getattr(automl, "feature_names", list(X.columns))
+            best_score = float(results.get("best_score", 0.0) or 0.0)
+            actual_task_type = results.get("task_type", "classification")
+
             self.models[model_id] = {
                 "automl": automl,
                 "model": automl.best_model,
                 "explainer": explainer,
-                "X_sample": X.sample(min(100, len(X))),
-                "feature_names": X.columns.tolist(),
+                "X_sample": X_sample,
+                "feature_names": feature_names,
+                "dataset_id": dataset_id,
                 "target_column": target_column,
-                "task_type": results["task_type"],
+                "task_type": actual_task_type,
                 "best_model_name": results["best_model"],
-                "best_score": results["best_score"],
+                "best_score": best_score,
                 "all_results": results["all_results"],
+                "created_at": datetime.utcnow().isoformat(),
             }
 
             # Update task status
@@ -165,32 +182,25 @@ class ModelService:
             raise ValueError(f"Model {model_id} not found")
 
         model_info = self.models[model_id]
-        model = model_info["model"]
+        automl = model_info.get("automl")
 
         # Convert to DataFrame
         df = pd.DataFrame([data])
 
-        # Ensure feature order matches training
-        df = df[model_info["feature_names"]]
-
-        # Make prediction
-        prediction = model.predict(df)[0]
-
-        # Try to get confidence
-        try:
-            if hasattr(model, "predict_proba"):
-                proba = model.predict_proba(df)[0]
+        if automl is not None:
+            prediction = automl.predict(df)[0]
+            try:
+                proba = automl.predict_proba(df)[0]
                 confidence = float(np.max(proba))
                 probabilities = proba.tolist()
-            else:
+            except Exception:
                 confidence = None
                 probabilities = None
-        except (AttributeError, ValueError, IndexError, TypeError) as exc:
-            logger.debug(
-                "Could not compute prediction confidence for model %s: %s",
-                model_id,
-                exc,
-            )
+        else:
+            model = model_info["model"]
+            cols = [c for c in model_info["feature_names"] if c in df.columns]
+            df = df[cols] if cols else df
+            prediction = model.predict(df)[0]
             confidence = None
             probabilities = None
 
@@ -314,16 +324,26 @@ class ModelService:
         return plot_data
 
     def list_models(self) -> List[Dict[str, Any]]:
-        """List all trained models"""
+        """List all trained models with complete summary metadata"""
         models_list = []
         for model_id, info in self.models.items():
+            best_score = float(info.get("best_score", 0.0) or 0.0)
+            task_type = info.get("task_type", "classification")
             models_list.append(
                 {
                     "model_id": model_id,
-                    "best_model": info["best_model_name"],
-                    "task_type": info["task_type"],
-                    "best_score": info["best_score"],
-                    "features": len(info["feature_names"]),
+                    "model_type": info.get("best_model_name", "AutoML"),
+                    "best_model": info.get("best_model_name", "AutoML"),
+                    "dataset_id": info.get("dataset_id", ""),
+                    "target_column": info.get("target_column", ""),
+                    "task_type": task_type,
+                    "best_score": best_score,
+                    "features": len(info.get("feature_names", [])),
+                    "metrics": {
+                        "accuracy" if task_type == "classification" else "r2_score": best_score,
+                        "best_score": best_score,
+                    },
+                    "created_at": info.get("created_at", datetime.utcnow().isoformat()),
                 }
             )
         return models_list

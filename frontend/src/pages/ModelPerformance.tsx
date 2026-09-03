@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getModels, trainModel, getModelMetrics, ModelSummary } from '../services/modelService';
-import { getDatasets } from '../services/datasetService';
+import { getDatasets, getDatasetColumns } from '../services/datasetService';
 import { useToast } from '../context/ToastProvider';
 import { Cpu, Plus, Trash2, Eye, Loader2 } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -18,6 +18,8 @@ const ModelPerformance: React.FC = () => {
     const [modelMetrics, setModelMetrics] = useState<any>(null);
     const [metricsLoading, setMetricsLoading] = useState(false);
     const [trainForm, setTrainForm] = useState({ dataset_id: '', target_column: '', task_type: 'auto' });
+    const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+    const [loadingCols, setLoadingCols] = useState(false);
     const { addToast } = useToast();
 
     useEffect(() => {
@@ -41,6 +43,23 @@ const ModelPerformance: React.FC = () => {
         fetchData();
     }, []);
 
+    const handleDatasetSelect = async (dsId: string) => {
+        setTrainForm(prev => ({ ...prev, dataset_id: dsId, target_column: '' }));
+        if (!dsId) {
+            setAvailableColumns([]);
+            return;
+        }
+        setLoadingCols(true);
+        try {
+            const cols = await getDatasetColumns(dsId);
+            setAvailableColumns(cols);
+        } catch {
+            setAvailableColumns([]);
+        } finally {
+            setLoadingCols(false);
+        }
+    };
+
     const handleTrain = async () => {
         if (!trainForm.dataset_id || !trainForm.target_column) {
             addToast('Please fill in all fields', 'warning');
@@ -52,6 +71,7 @@ const ModelPerformance: React.FC = () => {
             addToast('Model training started!', 'success');
             setShowTrainModal(false);
             setTrainForm({ dataset_id: '', target_column: '', task_type: 'auto' });
+            setAvailableColumns([]);
             // Refresh models list
             const updated = await getModels();
             setModels(Array.isArray(updated) ? updated : (updated as any)?.models || []);
@@ -208,7 +228,7 @@ const ModelPerformance: React.FC = () => {
                                 <select
                                     className={styles.formSelect}
                                     value={trainForm.dataset_id}
-                                    onChange={(e) => setTrainForm({ ...trainForm, dataset_id: e.target.value })}
+                                    onChange={(e) => handleDatasetSelect(e.target.value)}
                                     disabled={training}
                                 >
                                     <option value="">Select a dataset...</option>
@@ -221,15 +241,56 @@ const ModelPerformance: React.FC = () => {
                             </div>
 
                             <div className={styles.formField}>
-                                <label className={styles.formLabel}>Target Column</label>
-                                <input
-                                    type="text"
-                                    className={styles.formInput}
-                                    placeholder="e.g., price, churn, category"
-                                    value={trainForm.target_column}
-                                    onChange={(e) => setTrainForm({ ...trainForm, target_column: e.target.value })}
-                                    disabled={training}
-                                />
+                                <label className={styles.formLabel}>Target Column (Predictor Target)</label>
+                                {availableColumns.length > 0 ? (
+                                    <select
+                                        className={styles.formSelect}
+                                        value={trainForm.target_column}
+                                        onChange={(e) => setTrainForm({ ...trainForm, target_column: e.target.value })}
+                                        disabled={training}
+                                    >
+                                        <option value="">Select target column...</option>
+                                        {availableColumns.map((col) => (
+                                            <option key={col} value={col}>
+                                                {col}
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        className={styles.formInput}
+                                        placeholder={loadingCols ? "Loading columns..." : "Select a dataset to view columns"}
+                                        value={trainForm.target_column}
+                                        onChange={(e) => setTrainForm({ ...trainForm, target_column: e.target.value })}
+                                        disabled={training || loadingCols}
+                                    />
+                                )}
+                                {availableColumns.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', width: '100%' }}>
+                                            Quick select column:
+                                        </span>
+                                        {availableColumns.slice(0, 10).map((col) => (
+                                            <button
+                                                key={col}
+                                                type="button"
+                                                onClick={() => setTrainForm({ ...trainForm, target_column: col })}
+                                                style={{
+                                                    padding: '3px 8px',
+                                                    fontSize: '11px',
+                                                    borderRadius: '4px',
+                                                    background: trainForm.target_column === col ? 'var(--primary-light)' : 'var(--bg-card)',
+                                                    color: trainForm.target_column === col ? 'var(--primary)' : 'var(--text-secondary)',
+                                                    border: '1px solid ' + (trainForm.target_column === col ? 'var(--primary)' : 'var(--border-light)'),
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                {col}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div className={styles.formField}>

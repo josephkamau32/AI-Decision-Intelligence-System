@@ -7,25 +7,41 @@ from ..utils.config import settings
 
 logger = logging.getLogger(__name__)
 
+import time
+
 # Redis client instance
 redis_client: Optional[redis.Redis] = None
+_redis_last_attempt: float = 0.0
+_redis_logged_failure: bool = False
 
 
-def get_redis_client() -> redis.Redis:
-    """Get or create Redis client."""
-    global redis_client
-    if redis_client is None:
-        try:
-            redis_client = redis.from_url(
-                settings.redis_url, decode_responses=True, socket_connect_timeout=5
-            )
-            # Test connection
-            redis_client.ping()
-            logger.info("Redis connection established")
-        except redis.RedisError as e:
-            logger.error(f"Failed to connect to Redis: {e}")
-            redis_client = None
-    return redis_client
+def get_redis_client() -> Optional[redis.Redis]:
+    """Get or create Redis client with throttled reconnection attempts."""
+    global redis_client, _redis_last_attempt, _redis_logged_failure
+    if redis_client is not None:
+        return redis_client
+
+    now = time.time()
+    # Retry at most every 60 seconds if Redis is down
+    if now - _redis_last_attempt < 60:
+        return None
+
+    _redis_last_attempt = now
+    try:
+        client = redis.from_url(
+            settings.redis_url, decode_responses=True, socket_connect_timeout=1
+        )
+        client.ping()
+        logger.info("Redis connection established")
+        redis_client = client
+        _redis_logged_failure = False
+        return redis_client
+    except (redis.RedisError, Exception):
+        if not _redis_logged_failure:
+            logger.info(f"Redis unavailable at {settings.redis_url}; caching will operate in fallback mode.")
+            _redis_logged_failure = True
+        redis_client = None
+        return None
 
 
 def cache_key(prefix: str, *args, **kwargs) -> str:

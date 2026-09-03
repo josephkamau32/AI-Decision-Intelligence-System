@@ -48,12 +48,15 @@ class DatasetService:
             else:
                 df = None
 
+            column_names = []
             if df is not None:
                 rows = len(df)
                 columns = len(df.columns)
+                column_names = [str(c) for c in df.columns.tolist()]
                 logger.info(f"Dataset has {rows} rows and {columns} columns")
         except Exception as e:
             logger.error(f"Failed to read dataset for metadata: {e}")
+            column_names = []
 
         # Create dataset info with row and column counts
         dataset = DatasetInfo(
@@ -65,6 +68,7 @@ class DatasetService:
             size=len(content),
             rows=rows,
             columns=columns,
+            column_names=column_names,
         )
 
         # Store in memory (in real app, save to DB)
@@ -83,6 +87,39 @@ class DatasetService:
             if dataset.id == dataset_id:
                 return dataset
         return None
+
+    def get_dataset(self, dataset_id: str) -> Optional[DatasetInfo]:
+        """Alias for get_dataset_by_id."""
+        return self.get_dataset_by_id(dataset_id)
+
+    def delete_dataset(self, dataset_id: str) -> bool:
+        """Delete a dataset from memory and disk."""
+        for i, dataset in enumerate(self.datasets):
+            if dataset.id == dataset_id:
+                if os.path.exists(dataset.file_path):
+                    try:
+                        os.remove(dataset.file_path)
+                    except OSError as e:
+                        logger.warning(f"Could not remove file {dataset.file_path}: {e}")
+                self.datasets.pop(i)
+                logger.info(f"Dataset {dataset_id} deleted")
+                return True
+        return False
+
+    def get_dataset_columns(self, dataset_id: str) -> List[str]:
+        """Retrieve the column names of a dataset."""
+        dataset = self.get_dataset_by_id(dataset_id)
+        if dataset and getattr(dataset, "column_names", None):
+            return dataset.column_names
+        try:
+            df = self.load_dataset_file(dataset_id)
+            cols = [str(c) for c in df.columns.tolist()]
+            if dataset:
+                dataset.column_names = cols
+            return cols
+        except Exception as e:
+            logger.error(f"Failed to extract columns for dataset {dataset_id}: {e}")
+            return []
 
     def load_dataset_file(self, dataset_id: str) -> pd.DataFrame:
         """Load dataset file as DataFrame."""

@@ -90,21 +90,33 @@ async def train_model(request: TrainModelRequest, background_tasks: BackgroundTa
         # Get dataset from service
         dataset_df = model_service.get_dataset(request.dataset_id)
 
-        if request.target_column not in dataset_df.columns:
+        # Find matching target column (case-insensitive)
+        target_col = None
+        req_clean = str(request.target_column).strip().lower()
+        for col in dataset_df.columns:
+            if str(col).strip().lower() == req_clean:
+                target_col = str(col)
+                break
+
+        if not target_col:
+            avail_cols = [str(c) for c in dataset_df.columns.tolist()]
+            avail_preview = ", ".join(avail_cols[:15]) + ("..." if len(avail_cols) > 15 else "")
             raise HTTPException(
                 status_code=400,
-                detail=f"Target column '{request.target_column}' not found in dataset",
+                detail=f"Target column '{request.target_column}' not found in dataset. Available columns: {avail_preview}",
             )
 
-        # Create task ID
-        task_id = f"train_{request.dataset_id}_{request.target_column}"
+        # Create unique task/model ID
+        import uuid
+        task_id = f"model_{request.dataset_id[:8]}_{target_col}_{str(uuid.uuid4())[:6]}"
 
         # Add background task
         background_tasks.add_task(
             model_service.train_model_async,
             task_id=task_id,
             dataset_df=dataset_df,
-            target_column=request.target_column,
+            target_column=target_col,
+            dataset_id=request.dataset_id,
             task_type=request.task_type,
             test_size=request.test_size,
             experiment_name=request.experiment_name,
