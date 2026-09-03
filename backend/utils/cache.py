@@ -38,7 +38,9 @@ def get_redis_client() -> Optional[redis.Redis]:
         return redis_client
     except (redis.RedisError, Exception):
         if not _redis_logged_failure:
-            logger.info(f"Redis unavailable at {settings.redis_url}; caching will operate in fallback mode.")
+            logger.info(
+                f"Redis unavailable at {settings.redis_url}; caching will operate in fallback mode."
+            )
             _redis_logged_failure = True
         redis_client = None
         return None

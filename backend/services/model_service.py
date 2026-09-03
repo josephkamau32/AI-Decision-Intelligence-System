@@ -92,15 +92,22 @@ class ModelService:
             self.tasks[task_id]["message"] = "Training models..."
 
             # Train models
-            results = automl.fit(X, y, dataset_id=dataset_id, experiment_name=experiment_name)
+            results = automl.fit(
+                X, y, dataset_id=dataset_id, experiment_name=experiment_name
+            )
 
             # Update progress
             self.tasks[task_id]["progress"] = 80
             self.tasks[task_id]["message"] = "Generating explanations..."
 
             # Create explainer using clean processed data
-            if hasattr(automl, "X_train_processed") and not automl.X_train_processed.empty:
-                X_sample = automl.X_train_processed.sample(min(100, len(automl.X_train_processed)))
+            if (
+                hasattr(automl, "X_train_processed")
+                and not automl.X_train_processed.empty
+            ):
+                X_sample = automl.X_train_processed.sample(
+                    min(100, len(automl.X_train_processed))
+                )
             else:
                 X_sample = X.sample(min(100, len(X)))
 
@@ -340,7 +347,9 @@ class ModelService:
                     "best_score": best_score,
                     "features": len(info.get("feature_names", [])),
                     "metrics": {
-                        "accuracy" if task_type == "classification" else "r2_score": best_score,
+                        (
+                            "accuracy" if task_type == "classification" else "r2_score"
+                        ): best_score,
                         "best_score": best_score,
                     },
                     "created_at": info.get("created_at", datetime.utcnow().isoformat()),

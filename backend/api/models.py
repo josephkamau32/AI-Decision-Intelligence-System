@@ -100,7 +100,9 @@ async def train_model(request: TrainModelRequest, background_tasks: BackgroundTa
 
         if not target_col:
             avail_cols = [str(c) for c in dataset_df.columns.tolist()]
-            avail_preview = ", ".join(avail_cols[:15]) + ("..." if len(avail_cols) > 15 else "")
+            avail_preview = ", ".join(avail_cols[:15]) + (
+                "..." if len(avail_cols) > 15 else ""
+            )
             raise HTTPException(
                 status_code=400,
                 detail=f"Target column '{request.target_column}' not found in dataset. Available columns: {avail_preview}",
@@ -108,6 +110,7 @@ async def train_model(request: TrainModelRequest, background_tasks: BackgroundTa
 
         # Create unique task/model ID
         import uuid
+
         task_id = f"model_{request.dataset_id[:8]}_{target_col}_{str(uuid.uuid4())[:6]}"
 
         # Add background task

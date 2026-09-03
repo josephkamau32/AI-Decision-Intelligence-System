@@ -117,7 +117,9 @@ async def get_dataset_columns(dataset_id: str):
     if not cols:
         dataset = dataset_service.get_dataset(dataset_id)
         if not dataset:
-            raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
+            raise HTTPException(
+                status_code=404, detail=f"Dataset not found: {dataset_id}"
+            )
     return {"columns": cols}
 
 

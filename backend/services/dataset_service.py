@@ -100,7 +100,9 @@ class DatasetService:
                     try:
                         os.remove(dataset.file_path)
                     except OSError as e:
-                        logger.warning(f"Could not remove file {dataset.file_path}: {e}")
+                        logger.warning(
+                            f"Could not remove file {dataset.file_path}: {e}"
+                        )
                 self.datasets.pop(i)
                 logger.info(f"Dataset {dataset_id} deleted")
                 return True

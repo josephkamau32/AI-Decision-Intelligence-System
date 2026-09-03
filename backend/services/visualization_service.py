@@ -57,7 +57,11 @@ class VisualizationService:
             # Find date col
             date_col = None
             for col in df.columns:
-                if pd.api.types.is_datetime64_any_dtype(df[col]) or "date" in str(col).lower() or "time" in str(col).lower():
+                if (
+                    pd.api.types.is_datetime64_any_dtype(df[col])
+                    or "date" in str(col).lower()
+                    or "time" in str(col).lower()
+                ):
                     date_col = col
                     break
             if not date_col or not target:
@@ -85,7 +89,10 @@ class VisualizationService:
                 target = num_cols[0] if not num_cols.empty else None
             date_col = None
             for col in df.columns:
-                if pd.api.types.is_datetime64_any_dtype(df[col]) or "date" in str(col).lower():
+                if (
+                    pd.api.types.is_datetime64_any_dtype(df[col])
+                    or "date" in str(col).lower()
+                ):
                     date_col = col
                     break
             if not date_col or not target:

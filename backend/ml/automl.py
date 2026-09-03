@@ -102,7 +102,9 @@ class AutoML:
 
         # Binary or small discrete classes (<= 20 unique values or < 5% unique) -> classification
         if n_unique <= 20 or (n_total > 0 and (n_unique / n_total) < 0.05):
-            logger.info(f"Auto-detected task type: classification ({n_unique} unique classes)")
+            logger.info(
+                f"Auto-detected task type: classification ({n_unique} unique classes)"
+            )
             return "classification"
 
         # Continuous numeric target -> regression
@@ -260,7 +262,9 @@ class AutoML:
             "primary_score": metrics[primary_metric],
         }
 
-    def preprocess_fit(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
+    def preprocess_fit(
+        self, X: pd.DataFrame, y: pd.Series
+    ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Production-grade AutoML preprocessing:
         - Drops rows where target y is NaN
@@ -283,7 +287,11 @@ class AutoML:
         # 3. Process target
         if self.task_type == "classification":
             self.target_encoder = LabelEncoder()
-            y_clean = pd.Series(self.target_encoder.fit_transform(y.astype(str)), index=y.index, name=y.name)
+            y_clean = pd.Series(
+                self.target_encoder.fit_transform(y.astype(str)),
+                index=y.index,
+                name=y.name,
+            )
             self.classes_ = list(self.target_encoder.classes_)
         else:
             y_numeric = pd.to_numeric(y, errors="coerce")
@@ -291,7 +299,11 @@ class AutoML:
             if valid_y.sum() == 0:
                 self.task_type = "classification"
                 self.target_encoder = LabelEncoder()
-                y_clean = pd.Series(self.target_encoder.fit_transform(y.astype(str)), index=y.index, name=y.name)
+                y_clean = pd.Series(
+                    self.target_encoder.fit_transform(y.astype(str)),
+                    index=y.index,
+                    name=y.name,
+                )
                 self.classes_ = list(self.target_encoder.classes_)
             else:
                 X = X.loc[valid_y].copy()
@@ -315,7 +327,9 @@ class AutoML:
                 continue
             # Check high-cardinality ID
             col_str = str(col).lower()
-            if (col_str.endswith("_id") or col_str == "id") and X[col].nunique() > n_rows * 0.5:
+            if (col_str.endswith("_id") or col_str == "id") and X[
+                col
+            ].nunique() > n_rows * 0.5:
                 self.dropped_cols.append(col)
                 continue
             clean_cols.append(col)
@@ -325,12 +339,18 @@ class AutoML:
         # 5. Extract datetime features
         self.datetime_cols = []
         for col in list(X.columns):
-            if pd.api.types.is_datetime64_any_dtype(X[col]) or "date" in str(col).lower() or "time" in str(col).lower():
+            if (
+                pd.api.types.is_datetime64_any_dtype(X[col])
+                or "date" in str(col).lower()
+                or "time" in str(col).lower()
+            ):
                 try:
                     dt_series = pd.to_datetime(X[col], errors="coerce")
                     if dt_series.notna().sum() > 0.5 * n_rows:
                         median_year = dt_series.dt.year.median()
-                        X[f"{col}_year"] = dt_series.dt.year.fillna(median_year if pd.notna(median_year) else 2024)
+                        X[f"{col}_year"] = dt_series.dt.year.fillna(
+                            median_year if pd.notna(median_year) else 2024
+                        )
                         X[f"{col}_month"] = dt_series.dt.month.fillna(1)
                         X[f"{col}_day"] = dt_series.dt.day.fillna(1)
                         X[f"{col}_dayofweek"] = dt_series.dt.dayofweek.fillna(0)
@@ -375,7 +395,10 @@ class AutoML:
         """Transform new data using fitted preprocessing parameters"""
         X = X.copy()
         if hasattr(self, "dropped_cols") and self.dropped_cols:
-            X = X.drop(columns=[c for c in self.dropped_cols if c in X.columns], errors="ignore")
+            X = X.drop(
+                columns=[c for c in self.dropped_cols if c in X.columns],
+                errors="ignore",
+            )
 
         if hasattr(self, "datetime_cols") and self.datetime_cols:
             for col in self.datetime_cols:
@@ -388,7 +411,10 @@ class AutoML:
                         X[f"{col}_dayofweek"] = dt_series.dt.dayofweek.fillna(0)
                     except Exception:
                         pass
-            X = X.drop(columns=[c for c in self.datetime_cols if c in X.columns], errors="ignore")
+            X = X.drop(
+                columns=[c for c in self.datetime_cols if c in X.columns],
+                errors="ignore",
+            )
 
         if hasattr(self, "num_medians"):
             for col, med in self.num_medians.items():
@@ -404,7 +430,9 @@ class AutoML:
                     filled = X[col].fillna(fill_val).astype(str)
                     classes_set = set(le.classes_)
                     fallback = le.classes_[0] if len(le.classes_) > 0 else fill_val
-                    filled_mapped = filled.apply(lambda x: x if x in classes_set else fallback)
+                    filled_mapped = filled.apply(
+                        lambda x: x if x in classes_set else fallback
+                    )
                     X[col] = le.transform(filled_mapped)
                 else:
                     X[col] = 0
@@ -508,7 +536,9 @@ class AutoML:
                             mlflow.log_metrics(result["metrics"])
                             if log_artifacts:
                                 try:
-                                    mlflow.sklearn.log_model(result["model"], model_name)
+                                    mlflow.sklearn.log_model(
+                                        result["model"], model_name
+                                    )
                                 except Exception as e:
                                     logger.warning(
                                         f"Failed to log model artifact for {model_name}: {e}"
@@ -518,7 +548,9 @@ class AutoML:
                         logger.error(f"Failed to train {model_name}: {e}")
                         continue
         except Exception as e:
-            logger.warning(f"MLflow run context error: {e}. Falling back to direct training.")
+            logger.warning(
+                f"MLflow run context error: {e}. Falling back to direct training."
+            )
             for model_name, model in models.items():
                 try:
                     result = self.train_and_evaluate(
@@ -532,16 +564,24 @@ class AutoML:
                     )
                     results[model_name] = result
                 except Exception as model_err:
-                    logger.error(f"Failed to train {model_name} in fallback: {model_err}")
+                    logger.error(
+                        f"Failed to train {model_name} in fallback: {model_err}"
+                    )
                     continue
 
         # Robust fallback if no advanced models succeeded
         if not results:
-            logger.warning("No models succeeded in standard evaluation. Training robust fallback model...")
+            logger.warning(
+                "No models succeeded in standard evaluation. Training robust fallback model..."
+            )
             if self.task_type == "classification":
-                fallback_model = RandomForestClassifier(n_estimators=50, random_state=self.random_state)
+                fallback_model = RandomForestClassifier(
+                    n_estimators=50, random_state=self.random_state
+                )
             else:
-                fallback_model = RandomForestRegressor(n_estimators=50, random_state=self.random_state)
+                fallback_model = RandomForestRegressor(
+                    n_estimators=50, random_state=self.random_state
+                )
             fallback_model.fit(X_train, y_train)
             y_pred = fallback_model.predict(X_test)
             if self.task_type == "classification":
@@ -557,9 +597,7 @@ class AutoML:
             }
 
         # Select best model
-        self.best_model_name = max(
-            results, key=lambda x: results[x]["primary_score"]
-        )
+        self.best_model_name = max(results, key=lambda x: results[x]["primary_score"])
         self.best_model = results[self.best_model_name]["model"]
         self.best_score = results[self.best_model_name]["primary_score"]
 
@@ -659,7 +697,9 @@ class AutoML:
         if self.date_column is None:
             raise ValueError("No date column detected for time-series task")
 
-        logger.info(f"Training time-series models with {len(X)} samples using date_column={self.date_column}")
+        logger.info(
+            f"Training time-series models with {len(X)} samples using date_column={self.date_column}"
+        )
 
         # Prepare data for time-series
         df = X.copy()
