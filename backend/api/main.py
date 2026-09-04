@@ -15,9 +15,9 @@ from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from ..utils.limiter import limiter
 import time
 
 from .health import router as health_router
@@ -88,10 +88,6 @@ def generate_secure_demo_password(length: int = 16) -> str:
     random.shuffle(password_chars)
 
     return "".join(password_chars)
-
-
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address)
 
 
 # Lifespan context manager for startup/shutdown events

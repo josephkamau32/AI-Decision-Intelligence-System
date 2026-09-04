@@ -59,11 +59,19 @@ const ChatInterface: React.FC = () => {
                 confidence: response.confidence,
             };
             setMessages(prev => [...prev, botMessage]);
-        } catch {
-            addToast('Failed to get response from AI Copilot', 'error');
+        } catch (err: any) {
+            const status = err?.response?.status;
+            const errorMsg =
+                err?.response?.data?.error?.message ||
+                err?.response?.data?.detail ||
+                (typeof err?.response?.data?.error === 'string' ? err?.response?.data?.error : null) ||
+                (status === 429
+                    ? 'Rate limit exceeded (5 requests/minute). Please wait a moment before asking another question.'
+                    : 'Sorry, I couldn\'t process that request. Please try again.');
+            addToast(status === 429 ? 'Rate limit reached' : 'Failed to get response from AI Copilot', 'error');
             const errorMessage: Message = {
                 id: `error-${Date.now()}`,
-                text: 'Sorry, I couldn\'t process that request. Please try again.',
+                text: errorMsg,
                 sender: 'bot',
                 timestamp: new Date()
             };

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, Request
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from ..utils.validators import sanitize_input
 from ..utils.config import settings
+from ..utils.limiter import limiter, check_and_increment_daily_copilot_quota
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,8 +34,12 @@ class CopilotResponse(BaseModel):
 
 
 @router.post("/ask", response_model=CopilotResponse)
-async def ask_copilot(query: CopilotQuery):
-    """Ask AI Copilot a question with optional context."""
+@limiter.limit(settings.copilot_rate_limit)
+async def ask_copilot(request: Request, query: CopilotQuery):
+    """
+    Ask AI Copilot a question with optional context.
+    Protected with per-IP rate limiting (5 req/min) and hard daily quota checks.
+    """
     logger.info(f"Copilot query: {query.question[:100]}")
 
     try:
@@ -45,6 +50,25 @@ async def ask_copilot(query: CopilotQuery):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Question cannot be empty",
+            )
+
+        # Enforce hard daily cap to protect free-tier LLM quota
+        client_ip = (
+            request.client.host
+            if request.client
+            else (request.headers.get("x-forwarded-for") or "unknown")
+        )
+        allowed, current_count, max_limit = check_and_increment_daily_copilot_quota(
+            identifier=client_ip
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Daily AI Copilot request quota exceeded ({current_count}/{max_limit}). "
+                    "To prevent free-tier LLM resource exhaustion, a daily cap is enforced. "
+                    "Quota resets daily at 00:00 UTC."
+                ),
             )
 
         # Check if Google API key is configured
@@ -145,7 +169,9 @@ async def ask_copilot(query: CopilotQuery):
 
 
 @router.post("/query", response_model=CopilotResponse)
+@limiter.limit(settings.copilot_rate_limit)
 async def query_copilot(
+    request: Request,
     query: str = Query(..., min_length=1, max_length=2000),
     dataset_id: Optional[str] = Query(None),
     model_id: Optional[str] = Query(None),
@@ -154,4 +180,4 @@ async def query_copilot(
     copilot_query = CopilotQuery(
         question=query, dataset_id=dataset_id, model_id=model_id
     )
-    return await ask_copilot(copilot_query)
+    return await ask_copilot(request, copilot_query)

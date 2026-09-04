@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     # Rate Limiting
     rate_limit_enabled: bool = True
     rate_limit_per_minute: int = 60
+    copilot_rate_limit: str = "5/minute"
+    copilot_daily_limit: int = 100
 
     # Caching
     cache_enabled: bool = True
