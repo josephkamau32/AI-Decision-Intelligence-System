@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path regardless of execution context
+_project_root = str(Path(__file__).resolve().parent.parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 import logging
 import secrets
 import string
@@ -16,8 +24,6 @@ from .health import router as health_router
 from .datasets import router as datasets_router
 
 # Configure logging early
-import logging
-
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )

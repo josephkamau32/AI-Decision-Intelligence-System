@@ -15,7 +15,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("DEBUG_MODE", "DEBUG", "debug_mode", "debug"),
         description="Enable debug mode (stack traces, open CORS for local testing)",
     )
-    version: str = "1.0.0"
+    version: str = "1.0.1"
     api_v1_prefix: str = "/api/v1"
 
     # Database

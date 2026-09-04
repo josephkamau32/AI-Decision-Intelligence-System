@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     branch: main
-    buildCommand: "pip install -r backend/requirements.txt"
+    buildCommand: "pip install -r backend/requirements.txt && pip install -e ."
     startCommand: "python -m uvicorn backend.api.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
@@ -13,7 +13,7 @@ services:
       - key: PORT
         value: 8000
       - key: PYTHONPATH
-        value: .
+        value: /app:/app/backend:.
       - key: DEBUG_MODE
         value: "false"
       - key: ENVIRONMENT

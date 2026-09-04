@@ -1,0 +1,43 @@
+name: Production Deployment Smoke Check
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 06:00 UTC to guard against silent downtime / cold crashes
+    - cron: '0 6 * * *'
+
+jobs:
+  smoke-check:
+    name: Verify Render Backend Health & Latency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health Check with Retry & Spin-Up Backoff
+        shell: bash
+        run: |
+          URL="https://decisera-backend.onrender.com/api/v1/health"
+          echo "Pinging Decisera Backend at $URL..."
+          MAX_RETRIES=12
+          DELAY=15
+          SUCCESS=0
+
+          for ((i=1; i<=MAX_RETRIES; i++)); do
+            echo "Attempt $i of $MAX_RETRIES..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}\nTIME_TOTAL:%{time_total}" "$URL" || true)
+            HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            BODY=$(echo "$RESPONSE" | sed -e '/HTTP_STATUS:/,$d')
+
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "✅ Health check succeeded with HTTP 200!"
+              echo "Response payload: $BODY"
+              SUCCESS=1
+              break
+            else
+              echo "⚠️ Received HTTP $HTTP_STATUS (Instance may be waking from sleep). Waiting ${DELAY}s..."
+              sleep $DELAY
+            fi
+          done
+
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "❌ Production health check failed after $((MAX_RETRIES * DELAY)) seconds!"
+            exit 1
+          fi
