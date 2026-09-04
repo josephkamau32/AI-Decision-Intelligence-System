@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { setBackendWarmingManually } from '../services/api';
 
 interface User {
     id: string;
@@ -39,6 +40,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
+    const withWarmingCheck = async <T,>(fn: () => Promise<T>): Promise<T> => {
+        const timer = setTimeout(() => {
+            setBackendWarmingManually(true);
+        }, 3500);
+        try {
+            return await fn();
+        } finally {
+            clearTimeout(timer);
+            setBackendWarmingManually(false);
+        }
+    };
+
     // Check for existing token on mount
     useEffect(() => {
         const token = localStorage.getItem('auth_token');
@@ -52,12 +65,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const fetchCurrentUser = async (token: string) => {
         try {
-            const response = await fetch(`${API_URL}/api/v1/users/me`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
+            const response = await withWarmingCheck(() =>
+                fetch(`${API_URL}/api/v1/users/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                })
+            );
 
             if (response.ok) {
                 const userData = await response.json();
@@ -96,13 +111,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const login = async (username: string, password: string) => {
         try {
-            const response = await fetch(`${API_URL}/api/v1/users/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password }),
-            });
+            const response = await withWarmingCheck(() =>
+                fetch(`${API_URL}/api/v1/users/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                })
+            );
 
             if (!response.ok) {
                 let errorMsg = 'Login failed';
@@ -130,18 +147,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const register = async (username: string, email: string, password: string) => {
         try {
-            const response = await fetch(`${API_URL}/api/v1/users/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username,
-                    email,
-                    password,
-                    role: 'user',
-                }),
-            });
+            const response = await withWarmingCheck(() =>
+                fetch(`${API_URL}/api/v1/users/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        password,
+                        role: 'user',
+                    }),
+                })
+            );
 
             if (!response.ok) {
                 let errorMsg = 'Registration failed';

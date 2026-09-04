@@ -2,18 +2,56 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-// Create axios instance with default config
+// Cold start listener management for Render free tier (~50s cold start)
+type WarmingListener = (isWarming: boolean) => void;
+const warmingListeners = new Set<WarmingListener>();
+let activeRequests = 0;
+let warmingTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const subscribeBackendWarming = (listener: WarmingListener) => {
+    warmingListeners.add(listener);
+    return () => {
+        warmingListeners.delete(listener);
+    };
+};
+
+export const setBackendWarmingManually = (isWarming: boolean) => {
+    warmingListeners.forEach(cb => cb(isWarming));
+};
+
+const onRequestStart = () => {
+    activeRequests++;
+    if (!warmingTimer) {
+        // If request takes more than 3.5s, signal that backend is likely spinning up from sleep
+        warmingTimer = setTimeout(() => {
+            if (activeRequests > 0) {
+                warmingListeners.forEach(cb => cb(true));
+            }
+        }, 3500);
+    }
+};
+
+const onRequestEnd = () => {
+    activeRequests = Math.max(0, activeRequests - 1);
+    if (activeRequests === 0) {
+        if (warmingTimer) {
+            clearTimeout(warmingTimer);
+            warmingTimer = null;
+        }
+        warmingListeners.forEach(cb => cb(false));
+    }
+};
+
+// Create axios instance with default config (90s timeout for Render cold starts)
 const api: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000,
-    // Don't set default Content-Type - let axios determine it based on request data
-    // For JSON: axios auto-sets 'application/json'
-    // For FormData: axios auto-sets 'multipart/form-data' with boundary
+    timeout: 90000,
 });
 
 // Request interceptor
 api.interceptors.request.use(
     (config) => {
+        onRequestStart();
         // Add auth token to requests
         const token = localStorage.getItem('auth_token');
         if (token) {
@@ -22,6 +60,7 @@ api.interceptors.request.use(
         return config;
     },
     (error: AxiosError) => {
+        onRequestEnd();
         return Promise.reject(error);
     }
 );
@@ -29,9 +68,11 @@ api.interceptors.request.use(
 // Response interceptor
 api.interceptors.response.use(
     (response) => {
+        onRequestEnd();
         return response;
     },
     async (error: AxiosError) => {
+        onRequestEnd();
         if (error.response) {
             // Server responded with error status
             const { status, data } = error.response;
@@ -82,9 +123,12 @@ api.interceptors.response.use(
         } else if (error.request) {
             // Request made but no response received
             console.error('No response from server');
+            const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
             return Promise.reject({
                 status: 0,
-                message: 'Network error - please check your connection'
+                message: isTimeout
+                    ? 'Connection timed out. If the backend was sleeping, it may take up to a minute to start. Please retry.'
+                    : 'Network error - please check your connection or wait for backend to finish waking up.'
             });
         } else {
             // Something went wrong setting up the request
