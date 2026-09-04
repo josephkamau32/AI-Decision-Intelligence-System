@@ -256,7 +256,7 @@ def require_role(required_role: str):
     """
 
     async def role_checker(
-        current_user: Dict[str, Any] = Depends(get_current_user)
+        current_user: Dict[str, Any] = Depends(get_current_user),
     ) -> Dict[str, Any]:
         user_role = current_user.get("role", "viewer")
 
