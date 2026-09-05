@@ -207,6 +207,9 @@ docker exec aidecisionintelligencesystem-frontend-1 wget -qO- http://backend:800
 3. **Data Ingestion Robustness:**
    In early iterations, datasets containing mixed datetime strings, unencoded categorical levels, and high-cardinality ID columns caused pipeline failures. We redesigned `backend/ml/automl.py` with an automated preprocessing pipeline that enforces median numerical imputation, one-hot encoding for low-cardinality categoricals, datetime decomposition (year/month/day/hour), and automatic dropping of constant/ID columns before matrix hand-off to estimators.
 
+4. **Persistent Database vs. Ephemeral Container Storage:**
+   Render's free web services run on ephemeral containers that discard local disk files upon every deployment, manual redeploy, or idle spin-down. To ensure user accounts and credentials persist across redeploys, Decisera integrates with PostgreSQL via SQLAlchemy and `psycopg2-binary`, falling back to local SQLite in development. Note: Render's free PostgreSQL tier automatically expires 90 days after creation (provisioned September 5, 2026; expires December 4, 2026 unless upgraded to a paid persistent tier).
+
 ---
 
 ## 🧪 Testing & Quality Assurance
@@ -221,7 +224,7 @@ pytest -v
 # Run with test coverage report
 pytest -v --cov=backend/api --cov=backend/ml --cov=backend/services
 ```
-*44 unit and integration tests passing with 0 errors across datasets, models, copilot mocking, and data preprocessing.*
+*58 unit and integration tests passing with 0 errors across datasets, models, copilot mocking, persistent database storage, and data preprocessing.*
 
 ### Code Quality & Linters
 ```bash

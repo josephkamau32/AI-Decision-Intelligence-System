@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     version: str = "1.0.1"
     api_v1_prefix: str = "/api/v1"
 
-    # Database
+    # Database: PostgreSQL in production, SQLite fallback in development.
+    # Note: Render Free PostgreSQL instances expire 90 days after creation
+    # (~Dec 4, 2026 if created Sep 5, 2026).
     database_url: Optional[str] = None
 
     # Security & JWT
