@@ -1,3 +1,2 @@
 # Services module
-
-from .visualization_service import visualization_service
+# Eager imports removed to prevent heavy ML cascades at baseline startup

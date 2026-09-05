@@ -1,6 +1,7 @@
 # ==============================================================================
 # Production Dependencies for AI Decision Intelligence System
 # ==============================================================================
+--extra-index-url https://download.pytorch.org/whl/cpu
 
 # Core FastAPI & ASGI
 fastapi==0.125.0
@@ -38,8 +39,8 @@ matplotlib==3.10.8
 optuna==4.7.0
 plotly==6.5.0
 
-# Deep Learning & Time Series
-torch==2.9.1
+# Deep Learning & Time Series (CPU-only build to avoid CUDA/GPU overhead on Render free tier)
+torch==2.9.1+cpu
 prophet==1.2.1
 
 # MLOps & Experiment Tracking

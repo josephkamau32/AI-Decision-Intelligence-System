@@ -4,11 +4,8 @@ from pydantic import BaseModel
 import pandas as pd
 import logging
 
-# Make ML imports optional to allow auth to work without ML dependencies
+# Make ML service import optional to allow auth to work without dependencies
 try:
-    from ..ml.automl import AutoML
-    from ..ml.inference import ModelInference
-    from ..ml.explainability import ModelExplainer
     from ..services.model_service import model_service
 
     ML_AVAILABLE = True

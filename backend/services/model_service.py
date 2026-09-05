@@ -11,9 +11,6 @@ import logging
 from pathlib import Path
 import joblib
 
-from ..ml.automl import AutoML
-from ..ml.inference import ModelInference
-from ..ml.explainability import ModelExplainer
 from ..utils.cache import cache_get, cache_set, cache_delete
 from ..services.dataset_service import dataset_service
 
@@ -83,6 +80,10 @@ class ModelService:
             clean_df = dataset_df.loc[valid_mask].copy()
             X = clean_df.drop(columns=[target_column])
             y = clean_df[target_column]
+
+            # Lazy import AutoML and ModelExplainer to prevent high idle memory usage
+            from ..ml.automl import AutoML
+            from ..ml.explainability import ModelExplainer
 
             # Initialize AutoML
             automl = AutoML(task_type=task_type, test_size=test_size)

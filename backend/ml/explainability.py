@@ -2,15 +2,10 @@
 Model explainability using SHAP (SHapley Additive exPlanations)
 """
 
-import shap
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Union
 import logging
-import matplotlib
-
-matplotlib.use("Agg")  # Non-interactive backend
-import matplotlib.pyplot as plt
 import io
 import base64
 
@@ -35,6 +30,8 @@ class ModelExplainer:
 
     def _initialize_explainer(self):
         """Initialize appropriate SHAP explainer based on model type"""
+        import shap
+
         try:
             # Try TreeExplainer first (for tree-based models)
             self.explainer = shap.TreeExplainer(self.model)
@@ -211,6 +208,12 @@ class ModelExplainer:
         """
         logger.info("Generating SHAP summary plot")
 
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import shap
+
         # Calculate SHAP values
         shap_values = self.explainer.shap_values(X)
 
@@ -237,6 +240,11 @@ class ModelExplainer:
             Base64 encoded plot image
         """
         logger.info("Generating feature importance plot")
+
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
 
         # Get global importance
         importance_data = self.get_global_importance(X, top_n=top_n)

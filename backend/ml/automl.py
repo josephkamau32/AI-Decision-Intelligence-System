@@ -26,19 +26,12 @@ from xgboost import XGBClassifier, XGBRegressor
 import joblib
 import mlflow
 import mlflow.sklearn
-import mlflow.pytorch
 from typing import Dict, Any, List, Tuple, Optional
 import logging
 from datetime import datetime
 import os
 
 from ..ml.data_preprocessing import DataCleaner, FeatureEngineer
-from ..ml.time_series import (
-    ProphetForecaster,
-    LSTMForecaster,
-    detect_time_series,
-    calculate_forecast_metrics,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -149,11 +142,13 @@ class AutoML:
         """Return dictionary of time-series forecasting models to train"""
         models = {}
         try:
+            from ..ml.time_series import ProphetForecaster
             models["Prophet"] = ProphetForecaster()
         except Exception as e:
             logger.warning(f"Prophet unavailable: {e}")
 
         try:
+            from ..ml.time_series import LSTMForecaster
             models["LSTM"] = LSTMForecaster(
                 seq_length=10, hidden_size=64, epochs=epochs, batch_size=32
             )
@@ -749,6 +744,8 @@ class AutoML:
                             y_pred = model.predict(last_seq, periods=len(df_test))
 
                         # Calculate metrics
+                        from ..ml.time_series import calculate_forecast_metrics
+
                         y_true = df_test["target"].values
                         metrics = calculate_forecast_metrics(y_true, y_pred)
 

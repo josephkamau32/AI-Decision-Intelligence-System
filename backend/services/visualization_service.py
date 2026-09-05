@@ -9,7 +9,6 @@ from ..visualizations import (
 )
 from ..ml.data_ingestion import DataIngestion
 from .dataset_service import dataset_service
-from .model_service import model_service
 
 
 class VisualizationService:
@@ -31,6 +30,8 @@ class VisualizationService:
         return heatmap.generate_plot()
 
     def get_feature_importance(self, model_id: str) -> Optional[Dict[str, Any]]:
+        from .model_service import model_service
+
         model = model_service.models.get(model_id)
         if not model:
             return None
@@ -74,6 +75,8 @@ class VisualizationService:
     def get_forecast_plot(
         self, model_id: str, dataset_id: str
     ) -> Optional[Dict[str, Any]]:
+        from .model_service import model_service
+
         model = model_service.models.get(model_id)
         dataset = next(
             (d for d in dataset_service.datasets if d.id == dataset_id), None
