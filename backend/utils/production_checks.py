@@ -3,6 +3,7 @@ Production Environment Validation and Checks
 Validates configuration and dependencies on startup
 """
 
+import importlib.util
 import os
 import sys
 import logging
@@ -130,10 +131,15 @@ class ProductionValidator:
             )
 
     def check_dependencies(self, critical_imports: List[str]):
-        """Check that critical dependencies can be imported"""
+        """Check that critical dependencies are installed (without importing them).
+
+        Uses importlib.util.find_spec() instead of __import__() to avoid
+        loading heavy modules (torch, sklearn, etc.) during startup validation,
+        which can add 100+ seconds of import time on resource-constrained hosts.
+        """
         for module_name in critical_imports:
-            try:
-                __import__(module_name)
+            spec = importlib.util.find_spec(module_name)
+            if spec is not None:
                 self.results.append(
                     ValidationResult(
                         passed=True,
@@ -141,20 +147,23 @@ class ProductionValidator:
                         severity="info",
                     )
                 )
-            except ImportError as e:
+            else:
                 self.results.append(
                     ValidationResult(
                         passed=False,
-                        message=f"Missing critical dependency: {module_name} - {e}",
+                        message=f"Missing critical dependency: {module_name}",
                         severity="error",
                     )
                 )
 
     def check_optional_dependencies(self, optional_imports: List[str]):
-        """Check optional dependencies (warnings only)"""
+        """Check optional dependencies (warnings only).
+
+        Uses importlib.util.find_spec() to avoid loading heavy modules at startup.
+        """
         for module_name in optional_imports:
-            try:
-                __import__(module_name)
+            spec = importlib.util.find_spec(module_name)
+            if spec is not None:
                 self.results.append(
                     ValidationResult(
                         passed=True,
@@ -162,7 +171,7 @@ class ProductionValidator:
                         severity="info",
                     )
                 )
-            except ImportError:
+            else:
                 self.results.append(
                     ValidationResult(
                         passed=True,

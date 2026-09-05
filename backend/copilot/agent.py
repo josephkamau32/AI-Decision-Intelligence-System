@@ -1,6 +1,5 @@
 """AI Copilot Agent using Google Generative AI directly (no langchain)"""
 
-import google.generativeai as genai
 from ..utils.config import settings
 import logging
 
@@ -17,6 +16,9 @@ class AICopilotAgent:
             if not settings.google_api_key:
                 logger.warning("Google API key is not set in environment")
                 return
+
+            # Lazy import to avoid blocking app startup with heavy module load
+            import google.generativeai as genai
 
             # Configure Google Generative AI
             genai.configure(api_key=settings.google_api_key)
@@ -45,6 +47,9 @@ class AICopilotAgent:
             # Check if API key is available
             if not settings.google_api_key:
                 return "AI Copilot requires a Google API key to be configured. Please set GOOGLE_API_KEY in your environment."
+
+            # Lazy import (deferred from module level to avoid blocking startup)
+            import google.generativeai as genai
 
             # Reconfigure API on each request to avoid caching issues
             genai.configure(api_key=settings.google_api_key)

@@ -21,9 +21,9 @@ class TestCopilotAgent:
     def test_query_success_with_mocked_llm(self):
         """When API key is set, query correctly prompts the LLM and extracts the response text."""
         with patch("backend.copilot.agent.settings") as mock_settings, patch(
-            "backend.copilot.agent.genai.configure"
+            "google.generativeai.configure"
         ) as mock_configure, patch(
-            "backend.copilot.agent.genai.GenerativeModel"
+            "google.generativeai.GenerativeModel"
         ) as mock_model_cls:
 
             mock_settings.google_api_key = "mock-valid-key"
@@ -49,8 +49,8 @@ class TestCopilotAgent:
     def test_query_handles_auth_error_gracefully(self):
         """When the LLM raises an unauthenticated / invalid key error, agent catches it and returns guidance."""
         with patch("backend.copilot.agent.settings") as mock_settings, patch(
-            "backend.copilot.agent.genai.configure"
-        ), patch("backend.copilot.agent.genai.GenerativeModel") as mock_model_cls:
+            "google.generativeai.configure"
+        ), patch("google.generativeai.GenerativeModel") as mock_model_cls:
 
             mock_settings.google_api_key = "invalid-key"
             mock_instance = MagicMock()
@@ -71,8 +71,8 @@ class TestCopilotAgent:
     def test_query_handles_quota_error_gracefully(self):
         """When the LLM raises a quota/resource exhausted error, agent catches it and informs the user."""
         with patch("backend.copilot.agent.settings") as mock_settings, patch(
-            "backend.copilot.agent.genai.configure"
-        ), patch("backend.copilot.agent.genai.GenerativeModel") as mock_model_cls:
+            "google.generativeai.configure"
+        ), patch("google.generativeai.GenerativeModel") as mock_model_cls:
 
             mock_settings.google_api_key = "test-key"
             mock_instance = MagicMock()
@@ -93,8 +93,8 @@ class TestCopilotAgent:
     def test_query_handles_model_not_found_gracefully(self):
         """When the model is not found, agent returns enabling guidance."""
         with patch("backend.copilot.agent.settings") as mock_settings, patch(
-            "backend.copilot.agent.genai.configure"
-        ), patch("backend.copilot.agent.genai.GenerativeModel") as mock_model_cls:
+            "google.generativeai.configure"
+        ), patch("google.generativeai.GenerativeModel") as mock_model_cls:
 
             mock_settings.google_api_key = "test-key"
             mock_instance = MagicMock()
