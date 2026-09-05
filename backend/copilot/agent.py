@@ -79,7 +79,9 @@ User question: {user_input}"""
 
             # Check for specific Google API errors
             if "notfound" in error_type.lower() or "404" in error_msg:
-                logger.error(f"Gemini model not found or configuration error: {error_type}: {str(e)}")
+                logger.error(
+                    f"Gemini model not found or configuration error: {error_type}: {str(e)}"
+                )
                 return (
                     f"AI model configuration error: The requested Gemini model ({DEFAULT_MODEL_NAME}) "
                     "was not found or is deprecated. Please verify the configured model name."
@@ -95,8 +97,14 @@ User question: {user_input}"""
             ):
                 return "There was an authentication issue with the AI service. Please verify your Google API key is valid."
             elif "permissiondenied" in error_type.lower() or "permission" in error_msg:
-                if "disabled" in error_msg or "has not been used" in error_msg or "enable" in error_msg:
-                    logger.error(f"Gemini API disabled on Google Cloud project: {str(e)}")
+                if (
+                    "disabled" in error_msg
+                    or "has not been used" in error_msg
+                    or "enable" in error_msg
+                ):
+                    logger.error(
+                        f"Gemini API disabled on Google Cloud project: {str(e)}"
+                    )
                     return """The Gemini API is not enabled for your Google Cloud project. Please:
 
 1. Visit https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com

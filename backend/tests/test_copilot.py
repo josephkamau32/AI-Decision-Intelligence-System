@@ -133,7 +133,9 @@ class TestCopilotAgent:
             agent = AICopilotAgent()
             result = agent.query("Hello")
 
-            assert "The Gemini API is not enabled for your Google Cloud project" in result
+            assert (
+                "The Gemini API is not enabled for your Google Cloud project" in result
+            )
 
     def test_copilot_proxy_and_singleton(self):
         """Verify proxy forwards queries correctly."""

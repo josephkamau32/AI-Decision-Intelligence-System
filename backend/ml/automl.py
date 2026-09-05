@@ -143,12 +143,14 @@ class AutoML:
         models = {}
         try:
             from ..ml.time_series import ProphetForecaster
+
             models["Prophet"] = ProphetForecaster()
         except Exception as e:
             logger.warning(f"Prophet unavailable: {e}")
 
         try:
             from ..ml.time_series import LSTMForecaster
+
             models["LSTM"] = LSTMForecaster(
                 seq_length=10, hidden_size=64, epochs=epochs, batch_size=32
             )
