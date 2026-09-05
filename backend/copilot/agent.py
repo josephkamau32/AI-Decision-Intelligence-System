@@ -5,6 +5,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MODEL_NAME = "gemini-3.6-flash"
+
 
 class AICopilotAgent:
     def __init__(self):
@@ -23,9 +25,9 @@ class AICopilotAgent:
             # Configure Google Generative AI
             genai.configure(api_key=settings.google_api_key)
 
-            # Create the model - try gemini-pro which is more widely available
+            # Create the model - gemini-3.6-flash
             # Don't test it during init - just create it
-            self.model = genai.GenerativeModel("gemini-pro")
+            self.model = genai.GenerativeModel(DEFAULT_MODEL_NAME)
 
             logger.info("✓ AI Copilot model created (will be tested on first use)")
 
@@ -55,7 +57,7 @@ class AICopilotAgent:
             genai.configure(api_key=settings.google_api_key)
 
             # Create model fresh each time
-            model = genai.GenerativeModel("gemini-pro")
+            model = genai.GenerativeModel(DEFAULT_MODEL_NAME)
 
             # Create system context + user question
             prompt = f"""You are a helpful AI assistant for a data analytics platform called Decisera. 
@@ -76,16 +78,12 @@ User question: {user_input}"""
             error_type = type(e).__name__
 
             # Check for specific Google API errors
-            if "notfound" in error_type.lower():
-                logger.error("Gemini API model not found - API may not be enabled")
-                return """The Gemini API is not enabled or accessible. Please:
-
-1. Go to https://makersuite.google.com/app/apikey
-2. Ensure you have a valid API key
-3. Or visit https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
-4. Click "Enable" to activate the Generative Language API
-
-Your current API key may not have the Gemini API enabled."""
+            if "notfound" in error_type.lower() or "404" in error_msg:
+                logger.error(f"Gemini model not found or configuration error: {error_type}: {str(e)}")
+                return (
+                    f"AI model configuration error: The requested Gemini model ({DEFAULT_MODEL_NAME}) "
+                    "was not found or is deprecated. Please verify the configured model name."
+                )
             elif "resourceexhausted" in error_type.lower():
                 logger.warning("Google API quota exceeded")
                 return "The AI service quota has been exceeded. Please try again later or check your API quota at https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"
@@ -97,6 +95,13 @@ Your current API key may not have the Gemini API enabled."""
             ):
                 return "There was an authentication issue with the AI service. Please verify your Google API key is valid."
             elif "permissiondenied" in error_type.lower() or "permission" in error_msg:
+                if "disabled" in error_msg or "has not been used" in error_msg or "enable" in error_msg:
+                    logger.error(f"Gemini API disabled on Google Cloud project: {str(e)}")
+                    return """The Gemini API is not enabled for your Google Cloud project. Please:
+
+1. Visit https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
+2. Click "Enable" to activate the Generative Language API
+3. Verify your API key has access to the Generative Language API."""
                 return "Permission denied. Please check that your API key has access to the Gemini API."
             elif "timeout" in error_msg:
                 return (

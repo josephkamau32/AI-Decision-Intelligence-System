@@ -40,7 +40,7 @@ class TestCopilotAgent:
 
             assert result == "This is a simulated AI Copilot answer."
             mock_configure.assert_called_with(api_key="mock-valid-key")
-            mock_model_cls.assert_called_with("gemini-pro")
+            mock_model_cls.assert_called_with("gemini-3.6-flash")
             mock_instance.generate_content.assert_called_once()
 
             call_prompt = mock_instance.generate_content.call_args[0][0]
@@ -91,7 +91,7 @@ class TestCopilotAgent:
             assert "The AI service quota has been exceeded" in result
 
     def test_query_handles_model_not_found_gracefully(self):
-        """When the model is not found, agent returns enabling guidance."""
+        """When the model is not found, agent returns model configuration error."""
         with patch("backend.copilot.agent.settings") as mock_settings, patch(
             "google.generativeai.configure"
         ), patch("google.generativeai.GenerativeModel") as mock_model_cls:
@@ -103,14 +103,37 @@ class TestCopilotAgent:
                 pass
 
             mock_instance.generate_content.side_effect = NotFoundError(
-                "Model not found"
+                "404 models/gemini-pro is not found for API version v1beta"
             )
             mock_model_cls.return_value = mock_instance
 
             agent = AICopilotAgent()
             result = agent.query("Hello")
 
-            assert "The Gemini API is not enabled or accessible" in result
+            assert "AI model configuration error" in result
+            assert "gemini-3.6-flash" in result
+
+    def test_query_handles_api_disabled_gracefully(self):
+        """When the Gemini API is not enabled in Google Cloud project, agent returns enabling guidance."""
+        with patch("backend.copilot.agent.settings") as mock_settings, patch(
+            "google.generativeai.configure"
+        ), patch("google.generativeai.GenerativeModel") as mock_model_cls:
+
+            mock_settings.google_api_key = "test-key"
+            mock_instance = MagicMock()
+
+            class PermissionDenied(Exception):
+                pass
+
+            mock_instance.generate_content.side_effect = PermissionDenied(
+                "Generative Language API has not been used in project 12345 before or it is disabled. Enable it by visiting..."
+            )
+            mock_model_cls.return_value = mock_instance
+
+            agent = AICopilotAgent()
+            result = agent.query("Hello")
+
+            assert "The Gemini API is not enabled for your Google Cloud project" in result
 
     def test_copilot_proxy_and_singleton(self):
         """Verify proxy forwards queries correctly."""
