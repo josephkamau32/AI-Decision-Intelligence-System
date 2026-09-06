@@ -115,7 +115,6 @@ class AutoML:
             ),
             "XGBoost": XGBClassifier(
                 random_state=self.random_state,
-                use_label_encoder=False,
                 eval_metric="logloss",
             ),
             "GradientBoosting": GradientBoostingClassifier(
@@ -232,12 +231,28 @@ class AutoML:
         if use_cv:
             try:
                 if self.task_type == "classification":
-                    cv = StratifiedKFold(
-                        n_splits=5, shuffle=True, random_state=self.random_state
-                    )
-                    scoring = "accuracy"
+                    counts = pd.Series(y_train).value_counts()
+                    min_class_count = int(counts.min()) if not counts.empty else 0
+                    n_splits = max(2, min(5, min_class_count))
+                    if min_class_count >= 2:
+                        cv = StratifiedKFold(
+                            n_splits=n_splits,
+                            shuffle=True,
+                            random_state=self.random_state,
+                        )
+                        scoring = "accuracy"
+                    else:
+                        cv = KFold(
+                            n_splits=2, shuffle=True, random_state=self.random_state
+                        )
+                        scoring = "accuracy"
                 else:
-                    cv = KFold(n_splits=5, shuffle=True, random_state=self.random_state)
+                    n_splits = (
+                        max(2, min(5, len(X_train) // 2)) if len(X_train) >= 4 else 2
+                    )
+                    cv = KFold(
+                        n_splits=n_splits, shuffle=True, random_state=self.random_state
+                    )
                     scoring = "r2"
 
                 cv_scores = cross_val_score(
@@ -449,7 +464,7 @@ class AutoML:
         dataset_id: str = None,
         experiment_name: str = "AutoML",
         use_cv: bool = True,
-        log_artifacts: bool = True,
+        log_artifacts: bool = False,
     ) -> Dict[str, Any]:
         """
         Train multiple models and select the best one
@@ -626,6 +641,22 @@ class AutoML:
         self.best_model = joblib.load(filepath)
         logger.info(f"Model loaded from {filepath}")
         return self.best_model
+
+    def serialize_bundle(self) -> bytes:
+        """Serialize complete AutoML instance (estimator + preprocessing pipeline) to compressed bytes"""
+        import io
+
+        buf = io.BytesIO()
+        joblib.dump(self, buf, compress=3)
+        return buf.getvalue()
+
+    @classmethod
+    def load_bundle(cls, data: bytes) -> "AutoML":
+        """Deserialize complete AutoML instance from bytes"""
+        import io
+
+        buf = io.BytesIO(data)
+        return joblib.load(buf)
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """Make predictions using the best model"""

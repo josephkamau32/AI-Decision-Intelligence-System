@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
 from typing import List, Optional
 from ..schemas.dataset import (
     DatasetUploadRequest,
@@ -13,6 +13,7 @@ from ..utils.validators import (
     validate_pagination_params,
 )
 from ..utils.config import settings
+from ..utils.auth import get_current_user
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,10 +23,15 @@ router = APIRouter()
 
 @router.post("/upload", response_model=dict)
 async def upload_dataset(
-    file: UploadFile = File(...), name: str = Form(...), description: str = Form(None)
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    description: str = Form(None),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Upload a dataset file."""
-    logger.info(f"Uploading dataset: {name}")
+    """Upload a dataset file for the authenticated user."""
+    logger.info(
+        f"Uploading dataset: {name} by user {current_user.get('username', current_user.get('id'))}"
+    )
 
     try:
         # Validate dataset name
@@ -49,7 +55,9 @@ async def upload_dataset(
         await file.seek(0)
 
         request = DatasetUploadRequest(name=name, description=description)
-        dataset = await dataset_service.upload_dataset(file, request)
+        dataset = await dataset_service.upload_dataset(
+            file, request, user_id=current_user["id"]
+        )
         logger.info(f"Dataset {name} uploaded successfully")
         return {"message": "Dataset uploaded successfully", "dataset": dataset.dict()}
     except HTTPException:
@@ -66,19 +74,22 @@ async def list_datasets(
     search: Optional[str] = Query(None, description="Search query"),
     sort_by: Optional[str] = Query("created_at", description="Sort field"),
     sort_order: Optional[str] = Query(
-        "desc", regex="^(asc|desc)$", description="Sort order"
+        "desc", pattern="^(asc|desc)$", description="Sort order"
     ),
+    current_user: dict = Depends(get_current_user),
 ):
-    """List all uploaded datasets with pagination, search, and sorting."""
-    logger.info(f"Listing datasets - page: {page}, page_size: {page_size}")
+    """List all uploaded datasets belonging to the authenticated user with pagination, search, and sorting."""
+    logger.info(
+        f"Listing datasets for user {current_user['id']} - page: {page}, page_size: {page_size}"
+    )
 
     # Validate pagination parameters
     pagination_validation = validate_pagination_params(page, page_size)
     if not pagination_validation.valid:
         raise HTTPException(status_code=400, detail=pagination_validation.errors[0])
 
-    # Get datasets (this would normally query a database)
-    all_datasets = dataset_service.list_datasets()
+    # Get datasets for authenticated user
+    all_datasets = dataset_service.list_datasets(user_id=current_user["id"])
 
     # Apply search if provided
     if search:
@@ -91,7 +102,7 @@ async def list_datasets(
 
     # Calculate pagination
     total_count = len(all_datasets)
-    total_pages = (total_count + page_size - 1) // page_size
+    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
     start_idx = (page - 1) * page_size
     end_idx = start_idx + page_size
 
@@ -110,12 +121,15 @@ async def list_datasets(
 
 
 @router.get("/{dataset_id}/columns")
-async def get_dataset_columns(dataset_id: str):
-    """Get list of column names for a dataset."""
+async def get_dataset_columns(
+    dataset_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get list of column names for an authenticated user's dataset."""
     logger.info(f"Getting columns for dataset: {dataset_id}")
-    cols = dataset_service.get_dataset_columns(dataset_id)
+    cols = dataset_service.get_dataset_columns(dataset_id, user_id=current_user["id"])
     if not cols:
-        dataset = dataset_service.get_dataset(dataset_id)
+        dataset = dataset_service.get_dataset(dataset_id, user_id=current_user["id"])
         if not dataset:
             raise HTTPException(
                 status_code=404, detail=f"Dataset not found: {dataset_id}"
@@ -124,12 +138,15 @@ async def get_dataset_columns(dataset_id: str):
 
 
 @router.get("/{dataset_id}")
-async def get_dataset(dataset_id: str):
-    """Get details of a specific dataset."""
+async def get_dataset(
+    dataset_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get details of a specific dataset for the authenticated user."""
     logger.info(f"Getting dataset: {dataset_id}")
 
     try:
-        dataset = dataset_service.get_dataset(dataset_id)
+        dataset = dataset_service.get_dataset(dataset_id, user_id=current_user["id"])
         if not dataset:
             raise HTTPException(
                 status_code=404, detail=f"Dataset not found: {dataset_id}"
@@ -147,12 +164,15 @@ async def get_dataset(dataset_id: str):
 
 
 @router.delete("/{dataset_id}")
-async def delete_dataset(dataset_id: str):
-    """Delete a dataset."""
+async def delete_dataset(
+    dataset_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a dataset for the authenticated user."""
     logger.info(f"Deleting dataset: {dataset_id}")
 
     try:
-        success = dataset_service.delete_dataset(dataset_id)
+        success = dataset_service.delete_dataset(dataset_id, user_id=current_user["id"])
 
         if not success:
             raise HTTPException(

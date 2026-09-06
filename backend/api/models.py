@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Depends
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import pandas as pd
 import logging
+from ..utils.auth import get_current_user
 
 # Make ML service import optional to allow auth to work without dependencies
 try:
@@ -69,11 +70,13 @@ class ExplainResponse(BaseModel):
 
 
 @router.post("/train", response_model=TrainModelResponse)
-async def train_model(request: TrainModelRequest, background_tasks: BackgroundTasks):
+async def train_model(
+    request: TrainModelRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
     """
-    Train a model using AutoML
-
-    This endpoint starts a background training task
+    Train a model using AutoML for the authenticated user
     """
     if not ML_AVAILABLE:
         raise HTTPException(
@@ -82,10 +85,13 @@ async def train_model(request: TrainModelRequest, background_tasks: BackgroundTa
         )
 
     try:
-        logger.info(f"Received training request for dataset {request.dataset_id}")
+        user_id = current_user["id"]
+        logger.info(
+            f"Received training request for dataset {request.dataset_id} by user {user_id}"
+        )
 
-        # Get dataset from service
-        dataset_df = model_service.get_dataset(request.dataset_id)
+        # Get dataset from service scoped to current user
+        dataset_df = model_service.get_dataset(request.dataset_id, user_id=user_id)
 
         # Find matching target column (case-insensitive)
         target_col = None
@@ -110,13 +116,14 @@ async def train_model(request: TrainModelRequest, background_tasks: BackgroundTa
 
         task_id = f"model_{request.dataset_id[:8]}_{target_col}_{str(uuid.uuid4())[:6]}"
 
-        # Add background task
+        # Add background task with user_id
         background_tasks.add_task(
             model_service.train_model_async,
             task_id=task_id,
             dataset_df=dataset_df,
             target_column=target_col,
             dataset_id=request.dataset_id,
+            user_id=user_id,
             task_type=request.task_type,
             test_size=request.test_size,
             experiment_name=request.experiment_name,
@@ -136,7 +143,10 @@ async def train_model(request: TrainModelRequest, background_tasks: BackgroundTa
 
 
 @router.get("/tasks/{task_id}/status")
-async def get_task_status(task_id: str):
+async def get_task_status(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Get status of a training task"""
     try:
         status = model_service.get_task_status(task_id)
@@ -151,10 +161,13 @@ async def get_task_status(task_id: str):
 
 
 @router.get("/{model_id}/metrics", response_model=ModelMetricsResponse)
-async def get_model_metrics(model_id: str):
-    """Get detailed metrics for a trained model"""
+async def get_model_metrics(
+    model_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get detailed metrics for a trained model belonging to the authenticated user"""
     try:
-        metrics = model_service.get_model_metrics(model_id)
+        metrics = model_service.get_model_metrics(model_id, user_id=current_user["id"])
         if metrics is None:
             raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
 
@@ -168,13 +181,18 @@ async def get_model_metrics(model_id: str):
 
 
 @router.post("/predict", response_model=PredictResponse)
-async def predict_single(request: PredictRequest):
+async def predict_single(
+    request: PredictRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Make a single prediction"""
     try:
         logger.info(f"Prediction request for model {request.model_id}")
 
         # Load model and make prediction
-        result = model_service.predict(request.model_id, request.data)
+        result = model_service.predict(
+            request.model_id, request.data, user_id=current_user["id"]
+        )
 
         return PredictResponse(predictions=[result])
 
@@ -186,14 +204,19 @@ async def predict_single(request: PredictRequest):
 
 
 @router.post("/predict/batch", response_model=PredictResponse)
-async def predict_batch(request: BatchPredictRequest):
+async def predict_batch(
+    request: BatchPredictRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Make batch predictions"""
     try:
         logger.info(
             f"Batch prediction request for model {request.model_id}, {len(request.data)} samples"
         )
 
-        results = model_service.predict_batch(request.model_id, request.data)
+        results = model_service.predict_batch(
+            request.model_id, request.data, user_id=current_user["id"]
+        )
 
         return PredictResponse(predictions=results)
 
@@ -205,12 +228,18 @@ async def predict_batch(request: BatchPredictRequest):
 
 
 @router.get("/{model_id}/explain/global")
-async def get_global_explanations(model_id: str, top_n: int = Query(10, ge=1, le=50)):
+async def get_global_explanations(
+    model_id: str,
+    top_n: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(get_current_user),
+):
     """Get global feature importance"""
     try:
         logger.info(f"Global explanation request for model {model_id}")
 
-        explanation = model_service.get_global_explanation(model_id, top_n=top_n)
+        explanation = model_service.get_global_explanation(
+            model_id, top_n=top_n, user_id=current_user["id"]
+        )
 
         return explanation
 
@@ -222,12 +251,18 @@ async def get_global_explanations(model_id: str, top_n: int = Query(10, ge=1, le
 
 
 @router.post("/{model_id}/explain/local", response_model=ExplainResponse)
-async def explain_prediction(model_id: str, request: ExplainRequest):
+async def explain_prediction(
+    model_id: str,
+    request: ExplainRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Explain a single prediction"""
     try:
         logger.info(f"Local explanation request for model {model_id}")
 
-        explanation = model_service.explain_instance(model_id, request.instance)
+        explanation = model_service.explain_instance(
+            model_id, request.instance, user_id=current_user["id"]
+        )
 
         return ExplainResponse(explanation=explanation)
 
@@ -240,7 +275,9 @@ async def explain_prediction(model_id: str, request: ExplainRequest):
 
 @router.get("/{model_id}/explain/plots")
 async def get_explanation_plots(
-    model_id: str, plot_type: str = Query("summary", regex="^(summary|importance)$")
+    model_id: str,
+    plot_type: str = Query("summary", pattern="^(summary|importance)$"),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Get SHAP visualization plots
@@ -250,7 +287,9 @@ async def get_explanation_plots(
     try:
         logger.info(f"Plot request for model {model_id}, type: {plot_type}")
 
-        plot_data = model_service.get_explanation_plot(model_id, plot_type)
+        plot_data = model_service.get_explanation_plot(
+            model_id, plot_type, user_id=current_user["id"]
+        )
 
         return {"plot": plot_data, "type": plot_type}
 
@@ -262,10 +301,12 @@ async def get_explanation_plots(
 
 
 @router.get("/list")
-async def list_models():
-    """List all trained models"""
+async def list_models(
+    current_user: dict = Depends(get_current_user),
+):
+    """List all trained models for the authenticated user"""
     try:
-        models = model_service.list_models()
+        models = model_service.list_models(user_id=current_user["id"])
         return {"models": models}
     except Exception as e:
         logger.error(f"Failed to list models: {e}")
@@ -273,10 +314,13 @@ async def list_models():
 
 
 @router.delete("/{model_id}")
-async def delete_model(model_id: str):
+async def delete_model(
+    model_id: str,
+    current_user: dict = Depends(get_current_user),
+):
     """Delete a model"""
     try:
-        model_service.delete_model(model_id)
+        model_service.delete_model(model_id, user_id=current_user["id"])
         return {"message": f"Model {model_id} deleted successfully"}
     except Exception as e:
         logger.error(f"Failed to delete model: {e}")

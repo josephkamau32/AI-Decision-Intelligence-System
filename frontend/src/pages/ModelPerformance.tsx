@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getModels, trainModel, getModelMetrics, ModelSummary } from '../services/modelService';
+import { getModels, trainModel, getModelMetrics, getTaskStatus, ModelSummary } from '../services/modelService';
 import { getDatasets, getDatasetColumns } from '../services/datasetService';
 import { useToast } from '../context/ToastProvider';
 import { Cpu, Plus, Trash2, Eye, Loader2 } from 'lucide-react';
@@ -18,6 +18,7 @@ const ModelPerformance: React.FC = () => {
     const [modelMetrics, setModelMetrics] = useState<any>(null);
     const [metricsLoading, setMetricsLoading] = useState(false);
     const [trainForm, setTrainForm] = useState({ dataset_id: '', target_column: '', task_type: 'auto' });
+    const [trainingStatusText, setTrainingStatusText] = useState('');
     const [availableColumns, setAvailableColumns] = useState<string[]>([]);
     const [loadingCols, setLoadingCols] = useState(false);
     const { addToast } = useToast();
@@ -66,9 +67,40 @@ const ModelPerformance: React.FC = () => {
             return;
         }
         setTraining(true);
+        setTrainingStatusText('Initiating AutoML pipeline...');
         try {
-            await trainModel(trainForm);
-            addToast('Model training started!', 'success');
+            const startRes = await trainModel(trainForm);
+            const taskId = startRes?.task_id;
+            addToast('Training initiated! Evaluating candidate algorithms...', 'info');
+
+            if (taskId) {
+                // Poll task status until complete or failed (max 60 seconds)
+                const startTime = Date.now();
+                let completed = false;
+                while (!completed && (Date.now() - startTime) < 60000) {
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                    try {
+                        const statusData = await getTaskStatus(taskId);
+                        if (statusData?.message) {
+                            setTrainingStatusText(statusData.message);
+                        }
+                        if (statusData?.status === 'completed') {
+                            completed = true;
+                            addToast(statusData.message || 'Model trained successfully!', 'success');
+                            break;
+                        } else if (statusData?.status === 'failed') {
+                            throw new Error(statusData.error || statusData.message || 'Training failed');
+                        }
+                    } catch (pollErr: any) {
+                        if (pollErr.message && !pollErr.message.includes('404')) {
+                            throw pollErr;
+                        }
+                    }
+                }
+            } else {
+                addToast('Model training completed!', 'success');
+            }
+
             setShowTrainModal(false);
             setTrainForm({ dataset_id: '', target_column: '', task_type: 'auto' });
             setAvailableColumns([]);
@@ -76,9 +108,10 @@ const ModelPerformance: React.FC = () => {
             const updated = await getModels();
             setModels(Array.isArray(updated) ? updated : (updated as any)?.models || []);
         } catch (error: any) {
-            addToast(error?.response?.data?.detail || 'Training failed', 'error');
+            addToast(error?.response?.data?.detail || error?.message || 'Training failed', 'error');
         } finally {
             setTraining(false);
+            setTrainingStatusText('');
         }
     };
 
@@ -307,6 +340,13 @@ const ModelPerformance: React.FC = () => {
                                 </select>
                             </div>
                         </div>
+
+                        {training && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '8px', marginBottom: '16px', color: 'var(--primary)' }}>
+                                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                                <span style={{ fontSize: '13px', fontWeight: 500 }}>{trainingStatusText || 'Training in progress...'}</span>
+                            </div>
+                        )}
 
                         <div className={styles.modalActions}>
                             <Button variant="outline" onClick={() => setShowTrainModal(false)} disabled={training}>

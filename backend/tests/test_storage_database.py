@@ -14,6 +14,8 @@ import backend.utils.storage as storage_mod
 from backend.utils.storage import (
     SQLUserStorage,
     SQLAPIKeyStorage,
+    SQLDatasetStorage,
+    SQLModelStorage,
     UserModel,
     Base,
 )
@@ -329,3 +331,222 @@ class TestDatabaseURLNormalization:
             captured_urls[0]
             == "postgresql://user:pass@ep-cool-db.oregon.render.com:5432/decisera"
         )
+
+
+class TestSQLDatasetStorage:
+    @pytest.fixture
+    def dataset_storage(self, test_db_engine, tmp_path):
+        cache_dir = tmp_path / "datasets_cache"
+        return SQLDatasetStorage(engine=test_db_engine, cache_dir=cache_dir)
+
+    def test_save_and_retrieve_dataset(self, dataset_storage):
+        csv_bytes = b"feature_a,feature_b,target\n1.0,2.0,1\n3.0,4.0,0\n5.0,6.0,1\n"
+        saved = dataset_storage.save_dataset(
+            dataset_id="ds_test_001",
+            name="Test Dataset",
+            filename="test.csv",
+            file_type="csv",
+            file_content=csv_bytes,
+            description="Testing dataset persistence",
+            user_id="user_test_1",
+            row_count=3,
+            column_count=3,
+            column_names=["feature_a", "feature_b", "target"],
+        )
+
+        assert saved["id"] == "ds_test_001"
+        assert saved["name"] == "Test Dataset"
+        assert saved["rows"] == 3
+        assert saved["columns"] == 3
+
+        # Retrieve metadata
+        retrieved = dataset_storage.get_dataset("ds_test_001", user_id="user_test_1")
+        assert retrieved is not None
+        assert retrieved["name"] == "Test Dataset"
+        # Large binary file content should NOT be in metadata dict
+        assert "file_content" not in retrieved
+
+        # Retrieve dataframe
+        df = dataset_storage.get_dataset_dataframe("ds_test_001", user_id="user_test_1")
+        assert df.shape == (3, 3)
+        assert list(df.columns) == ["feature_a", "feature_b", "target"]
+        assert df["target"].tolist() == [1, 0, 1]
+
+    def test_user_isolation(self, dataset_storage):
+        csv_bytes = b"x,y\n1,2\n"
+        dataset_storage.save_dataset(
+            dataset_id="ds_user1",
+            name="User 1 Data",
+            filename="u1.csv",
+            file_type="csv",
+            file_content=csv_bytes,
+            user_id="user_1",
+        )
+        dataset_storage.save_dataset(
+            dataset_id="ds_user2",
+            name="User 2 Data",
+            filename="u2.csv",
+            file_type="csv",
+            file_content=csv_bytes,
+            user_id="user_2",
+        )
+
+        # User 1 should only see their dataset
+        user1_list = dataset_storage.list_datasets(user_id="user_1")
+        assert len(user1_list) == 1
+        assert user1_list[0]["id"] == "ds_user1"
+
+        # User 2 cannot access user 1's dataset
+        assert dataset_storage.get_dataset("ds_user1", user_id="user_2") is None
+
+    def test_container_restart_simulation(
+        self, dataset_storage, test_db_engine, tmp_path
+    ):
+        """Simulate container restart: wipe in-memory cache and local disk cache; verify SQL restores data."""
+        csv_bytes = b"col1,col2\n10,20\n30,40\n"
+        dataset_storage.save_dataset(
+            dataset_id="ds_restart_test",
+            name="Restart Dataset",
+            filename="restart.csv",
+            file_type="csv",
+            file_content=csv_bytes,
+            user_id="user_restart",
+            row_count=2,
+            column_count=2,
+            column_names=["col1", "col2"],
+        )
+
+        # Wipe RAM cache and disk cache
+        dataset_storage._df_cache.clear()
+        for f in dataset_storage.cache_dir.glob("*"):
+            f.unlink()
+        assert len(list(dataset_storage.cache_dir.glob("*"))) == 0
+
+        # Create a new storage instance pointing to the same database (simulating a fresh container boot)
+        fresh_cache_dir = tmp_path / "fresh_cache"
+        fresh_storage = SQLDatasetStorage(
+            engine=test_db_engine, cache_dir=fresh_cache_dir
+        )
+
+        # Fresh storage must successfully reconstruct the DataFrame from the SQL LargeBinary column
+        restored_df = fresh_storage.get_dataset_dataframe(
+            "ds_restart_test", user_id="user_restart"
+        )
+        assert restored_df.shape == (2, 2)
+        assert restored_df["col1"].tolist() == [10, 30]
+        assert restored_df["col2"].tolist() == [20, 40]
+
+    def test_delete_dataset(self, dataset_storage):
+        csv_bytes = b"a,b\n1,2\n"
+        dataset_storage.save_dataset(
+            dataset_id="ds_del_test",
+            name="Delete Me",
+            filename="del.csv",
+            file_type="csv",
+            file_content=csv_bytes,
+            user_id="user_del",
+        )
+        assert (
+            dataset_storage.get_dataset("ds_del_test", user_id="user_del") is not None
+        )
+
+        deleted = dataset_storage.delete_dataset("ds_del_test", user_id="user_del")
+        assert deleted is True
+        assert dataset_storage.get_dataset("ds_del_test", user_id="user_del") is None
+
+
+class TestSQLModelStorage:
+    @pytest.fixture
+    def model_storage(self, test_db_engine):
+        return SQLModelStorage(engine=test_db_engine)
+
+    def test_save_and_retrieve_model(self, model_storage):
+        import io
+        import joblib
+        from sklearn.ensemble import RandomForestClassifier
+        import numpy as np
+
+        # Train dummy model
+        clf = RandomForestClassifier(n_estimators=5, random_state=42)
+        X = np.array([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0], [4.0, 5.0]])
+        y = np.array([0, 0, 1, 1])
+        clf.fit(X, y)
+
+        buf = io.BytesIO()
+        joblib.dump(clf, buf)
+        artifact_bytes = buf.getvalue()
+
+        saved = model_storage.save_model(
+            model_id="model_test_001",
+            dataset_id="ds_001",
+            target_column="target",
+            task_type="classification",
+            best_model_name="RandomForestClassifier",
+            best_score=0.95,
+            feature_names=["f1", "f2"],
+            metrics={"accuracy": 0.95, "f1_score": 0.94},
+            all_results={"RandomForestClassifier": {"accuracy": 0.95}},
+            model_artifact=artifact_bytes,
+            user_id="user_model_1",
+        )
+
+        assert saved["model_id"] == "model_test_001"
+        assert saved["best_model"] == "RandomForestClassifier"
+        assert saved["best_score"] == 0.95
+
+        # Metadata listing should not fetch LargeBinary
+        models = model_storage.list_models(user_id="user_model_1")
+        assert len(models) == 1
+        assert models[0]["model_id"] == "model_test_001"
+        assert "model_artifact" not in models[0]
+
+        # Model bundle loading and prediction
+        bundle = model_storage.get_model_bundle(
+            "model_test_001", user_id="user_model_1"
+        )
+        assert bundle is not None
+        estimator = bundle["model"]
+        preds = estimator.predict([[1.0, 2.0], [4.0, 5.0]])
+        assert len(preds) == 2
+        assert preds[0] == 0
+        assert preds[1] == 1
+
+    def test_model_container_restart_simulation(self, model_storage, test_db_engine):
+        """Simulate container restart: clear RAM cache and ensure bundle is restored from SQL bytea column."""
+        import io
+        import joblib
+        from sklearn.tree import DecisionTreeClassifier
+
+        tree = DecisionTreeClassifier()
+        tree.fit([[1], [2], [3], [4]], [0, 0, 1, 1])
+        buf = io.BytesIO()
+        joblib.dump(tree, buf)
+
+        model_storage.save_model(
+            model_id="model_restart_test",
+            dataset_id="ds_999",
+            target_column="y",
+            task_type="classification",
+            best_model_name="DecisionTreeClassifier",
+            best_score=1.0,
+            feature_names=["f1"],
+            metrics={"accuracy": 1.0},
+            all_results={},
+            model_artifact=buf.getvalue(),
+            user_id="user_restart",
+        )
+
+        # Clear in-memory bundle cache
+        model_storage._bundle_cache.clear()
+
+        # Create fresh instance to simulate new container
+        fresh_model_storage = SQLModelStorage(engine=test_db_engine)
+        bundle = fresh_model_storage.get_model_bundle(
+            "model_restart_test", user_id="user_restart"
+        )
+
+        assert bundle is not None
+        assert bundle["best_model_name"] == "DecisionTreeClassifier"
+        # Verify model makes predictions correctly
+        assert bundle["model"].predict([[1]])[0] == 0
+        assert bundle["model"].predict([[4]])[0] == 1

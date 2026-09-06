@@ -2,8 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock
 from backend.api.main import app
+from backend.utils.auth import get_current_user
 
 client = TestClient(app, raise_server_exceptions=False)
+
+MOCK_USER = {"id": "test_user_123", "email": "test@example.com"}
 
 
 class TestHealthAPI:
@@ -16,7 +19,22 @@ class TestHealthAPI:
         assert "timestamp" in data
 
 
+class TestDatasetsAPIAuth:
+    def test_unauthenticated_requests_rejected(self):
+        """Ensure unauthenticated access to datasets is rejected with 401"""
+        # Ensure no overrides
+        app.dependency_overrides.pop(get_current_user, None)
+        response = client.get("/api/v1/datasets/")
+        assert response.status_code == 401
+
+
 class TestDatasetsAPI:
+    def setup_method(self):
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+
+    def teardown_method(self):
+        app.dependency_overrides.pop(get_current_user, None)
+
     @patch("backend.api.datasets.dataset_service")
     def test_list_datasets(self, mock_service):
         mock_service.list_datasets.return_value = []
