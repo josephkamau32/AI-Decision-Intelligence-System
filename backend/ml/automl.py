@@ -643,12 +643,36 @@ class AutoML:
         return self.best_model
 
     def serialize_bundle(self) -> bytes:
-        """Serialize complete AutoML instance (estimator + preprocessing pipeline) to compressed bytes"""
+        """Serialize AutoML instance with only inference-essential data.
+
+        Temporarily strips heavy attributes (all candidate models, results
+        containing model objects, and the full training DataFrame) to produce
+        a lean blob suitable for PostgreSQL bytea storage on constrained
+        environments (Render free tier, 512 MB RAM, external DB over WAN).
+        Attributes are restored after serialization so the in-memory object
+        remains fully functional.
+        """
         import io
 
-        buf = io.BytesIO()
-        joblib.dump(self, buf, compress=3)
-        return buf.getvalue()
+        # Save heavy attributes
+        saved_models = getattr(self, "models", {})
+        saved_results = getattr(self, "results", {})
+        saved_X_train = getattr(self, "X_train_processed", None)
+
+        try:
+            # Strip them for serialization — only best_model + preprocessing kept
+            self.models = {}
+            self.results = {}
+            self.X_train_processed = None
+
+            buf = io.BytesIO()
+            joblib.dump(self, buf, compress=3)
+            return buf.getvalue()
+        finally:
+            # Restore so in-memory object stays fully functional
+            self.models = saved_models
+            self.results = saved_results
+            self.X_train_processed = saved_X_train
 
     @classmethod
     def load_bundle(cls, data: bytes) -> "AutoML":

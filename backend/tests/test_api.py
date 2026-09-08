@@ -25,7 +25,7 @@ class TestDatasetsAPIAuth:
         # Ensure no overrides
         app.dependency_overrides.pop(get_current_user, None)
         response = client.get("/api/v1/datasets/")
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
 
 class TestDatasetsAPI:

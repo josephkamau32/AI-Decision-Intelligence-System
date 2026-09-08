@@ -3,10 +3,14 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 // Cold start listener management for Render free tier (~50s cold start)
+// Smart detection: only triggers after genuine idle periods, not on every slow WAN query
 type WarmingListener = (isWarming: boolean) => void;
 const warmingListeners = new Set<WarmingListener>();
 let activeRequests = 0;
 let warmingTimer: ReturnType<typeof setTimeout> | null = null;
+let lastSuccessfulResponse = Date.now(); // Track when backend last responded
+const IDLE_THRESHOLD_MS = 60000;  // 60s — backend may sleep after ~15min idle on Render
+const WARMING_DELAY_MS = 8000;    // 8s — well above warm WAN latency (1-3s), catches real cold starts (44s+)
 
 export const subscribeBackendWarming = (listener: WarmingListener) => {
     warmingListeners.add(listener);
@@ -21,18 +25,22 @@ export const setBackendWarmingManually = (isWarming: boolean) => {
 
 const onRequestStart = () => {
     activeRequests++;
-    if (!warmingTimer) {
-        // If request takes more than 3.5s, signal that backend is likely spinning up from sleep
+    // Only start the warming timer if backend hasn't responded recently
+    // (i.e., it may have gone to sleep after idle period)
+    const timeSinceLastSuccess = Date.now() - lastSuccessfulResponse;
+    if (!warmingTimer && timeSinceLastSuccess > IDLE_THRESHOLD_MS) {
         warmingTimer = setTimeout(() => {
             if (activeRequests > 0) {
                 warmingListeners.forEach(cb => cb(true));
             }
-        }, 3500);
+        }, WARMING_DELAY_MS);
     }
 };
 
 const onRequestEnd = () => {
     activeRequests = Math.max(0, activeRequests - 1);
+    // Mark backend as responsive
+    lastSuccessfulResponse = Date.now();
     if (activeRequests === 0) {
         if (warmingTimer) {
             clearTimeout(warmingTimer);

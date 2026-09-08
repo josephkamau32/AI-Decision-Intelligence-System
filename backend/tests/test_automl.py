@@ -113,6 +113,34 @@ class TestAutoML:
             loaded_model = automl.load_model(model_file)
             assert loaded_model is not None
 
+    def test_serialize_and_load_bundle(self, classification_data):
+        X, y = classification_data
+        automl = AutoML(task_type="classification", test_size=0.2)
+        automl.fit(
+            X,
+            y,
+            experiment_name="test_automl_bundle",
+            use_cv=False,
+            log_artifacts=False,
+        )
+
+        assert len(automl.models) > 0
+
+        bundle_bytes = automl.serialize_bundle()
+        assert isinstance(bundle_bytes, bytes)
+        assert len(bundle_bytes) > 0
+
+        # In-memory object restored after serialization
+        assert len(automl.models) > 0
+        assert automl.results is not None
+
+        # Load bundle and verify predictions match
+        loaded = AutoML.load_bundle(bundle_bytes)
+        assert loaded.best_model is not None
+        preds_orig = automl.predict(X.head(5))
+        preds_loaded = loaded.predict(X.head(5))
+        np.testing.assert_array_equal(preds_orig, preds_loaded)
+
     @pytest.mark.slow
     def test_fit_classification_with_mlflow_packaging(self, classification_data):
         """End-to-end test with full MLflow artifact logging and model registration"""

@@ -74,10 +74,11 @@ const ModelPerformance: React.FC = () => {
             addToast('Training initiated! Evaluating candidate algorithms...', 'info');
 
             if (taskId) {
-                // Poll task status until complete or failed (max 60 seconds)
+                // Poll task status until complete or failed (max 90 seconds)
                 const startTime = Date.now();
+                const POLL_TIMEOUT_MS = 90000;
                 let completed = false;
-                while (!completed && (Date.now() - startTime) < 60000) {
+                while (!completed && (Date.now() - startTime) < POLL_TIMEOUT_MS) {
                     await new Promise((resolve) => setTimeout(resolve, 1500));
                     try {
                         const statusData = await getTaskStatus(taskId);
@@ -89,13 +90,29 @@ const ModelPerformance: React.FC = () => {
                             addToast(statusData.message || 'Model trained successfully!', 'success');
                             break;
                         } else if (statusData?.status === 'failed') {
-                            throw new Error(statusData.error || statusData.message || 'Training failed');
+                            const errorMsg = statusData.error || statusData.message || 'Training failed';
+                            addToast(`Training failed: ${errorMsg}`, 'error');
+                            setShowTrainModal(false);
+                            setTrainForm({ dataset_id: '', target_column: '', task_type: 'auto' });
+                            setAvailableColumns([]);
+                            setTraining(false);
+                            setTrainingStatusText('');
+                            return;
                         }
                     } catch (pollErr: any) {
-                        if (pollErr.message && !pollErr.message.includes('404')) {
-                            throw pollErr;
+                        // 404 is expected briefly before task registers — ignore it
+                        if (pollErr?.status === 404 || (pollErr.message && pollErr.message.includes('404'))) {
+                            continue;
                         }
+                        throw pollErr;
                     }
+                }
+
+                if (!completed) {
+                    addToast(
+                        'Training is taking longer than expected. Check the Model Performance page shortly to see if it completed.',
+                        'warning'
+                    );
                 }
             } else {
                 addToast('Model training completed!', 'success');

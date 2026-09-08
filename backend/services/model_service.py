@@ -143,25 +143,54 @@ class ModelService:
                 "created_at": datetime.utcnow().isoformat(),
             }
 
-            # Serialize bundle with joblib into bytes
-            artifact_bytes = automl.serialize_bundle()
+            # Serialize bundle with joblib into bytes (lean — strips candidate models & training data)
+            try:
+                artifact_bytes = automl.serialize_bundle()
+                artifact_size_kb = len(artifact_bytes) / 1024
+                logger.info(f"Serialized model artifact: {artifact_size_kb:.1f} KB")
+            except Exception as ser_err:
+                logger.error(
+                    f"Model serialization failed for task {task_id}: {ser_err}",
+                    exc_info=True,
+                )
+                self.tasks[task_id] = {
+                    "status": "failed",
+                    "message": f"Model trained but serialization failed: {str(ser_err)}",
+                    "progress": 0,
+                    "error": str(ser_err),
+                }
+                return
 
             # Persist directly into PostgreSQL / SQLite database
-            metrics_dict = results["all_results"].get(results["best_model"], {})
-            self.storage.save_model(
-                model_id=model_id,
-                dataset_id=dataset_id,
-                target_column=target_column,
-                task_type=actual_task_type,
-                best_model_name=results["best_model"],
-                best_score=best_score,
-                feature_names=feature_names,
-                metrics=metrics_dict,
-                all_results=results["all_results"],
-                model_artifact=artifact_bytes,
-                user_id=user_id,
-                bundle=model_bundle,
-            )
+            # If save fails, task fails cleanly — no metadata-only ghost records
+            try:
+                metrics_dict = results["all_results"].get(results["best_model"], {})
+                self.storage.save_model(
+                    model_id=model_id,
+                    dataset_id=dataset_id,
+                    target_column=target_column,
+                    task_type=actual_task_type,
+                    best_model_name=results["best_model"],
+                    best_score=best_score,
+                    feature_names=feature_names,
+                    metrics=metrics_dict,
+                    all_results=results["all_results"],
+                    model_artifact=artifact_bytes,
+                    user_id=user_id,
+                    bundle=model_bundle,
+                )
+            except Exception as save_err:
+                logger.error(
+                    f"Failed to save model to database for task {task_id}: {save_err}",
+                    exc_info=True,
+                )
+                self.tasks[task_id] = {
+                    "status": "failed",
+                    "message": f"Model trained but could not be saved: {str(save_err)}",
+                    "progress": 0,
+                    "error": str(save_err),
+                }
+                return
 
             # Store in fast memory cache
             self.models[model_id] = model_bundle
